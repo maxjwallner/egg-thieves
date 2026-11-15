@@ -755,6 +755,9 @@
         netConnected=anyConn();
         netStatus('A guest left. The computer takes their seat.');
       });
+      c.on('iceStateChanged',function(state){
+        if(state==='failed') netStatus('A guest tried to join but no path could be opened between the devices. If it keeps happening, put both devices on the same WiFi and try again.');
+      });
       c.on('error',function(){});
     }
     function wireConn(c){
@@ -775,6 +778,9 @@
         }
       });
       c.on('close',function(){ netConnected=false; netStatus('Connection closed. Refresh or host / join again to reconnect.'); });
+      c.on('iceStateChanged',function(state){
+        if(state==='failed') netStatus(netConnected?'The connection dropped. Refresh or host / join again to reconnect.':'The two devices could not open a path between them. Try both on the same WiFi, then refresh and rejoin.');
+      });
       c.on('error',function(){ netStatus('Connection problem. Check the code and try again.'); });
     }
     function makeCode(){
@@ -785,19 +791,41 @@
     function peerReady(){
       return typeof window.Peer!=='undefined';
     }
+    // Connection helpers (ICE servers): STUN helps two devices find
+    // a direct path to each other; the free public TURN relays are
+    // the fallback that carries the game when no direct path exists
+    // (different networks, phone data, hotel WiFi that keeps devices
+    // apart). With no relay configured, joins on such networks hang
+    // forever at "Joining..." and never show an error.
+    var PEER_OPTS={config:{iceServers:[
+      {urls:'stun:stun.l.google.com:19302'},
+      {urls:'stun:stun.cloudflare.com:3478'},
+      {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
+      {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
+      {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
+    ]}};
+    function peerErrorText(err){
+      var t=err&&err.type?err.type:'';
+      if(t==='peer-unavailable') return 'Room not found. Check the code, and make sure the host pressed Host first and is still on the waiting screen.';
+      if(t==='unavailable-id') return 'That room code was just taken by someone else. Press Host again for a fresh code.';
+      if(t==='network'||t==='server-error'||t==='socket-error'||t==='socket-closed') return 'Could not reach the connection service. Check your internet connection and try again.';
+      if(t==='browser-incompatible') return 'This browser does not support online play. Try an up-to-date Chrome or Safari.';
+      if(t==='invalid-id'||t==='invalid-key') return 'That room code does not look right. Check it and try again.';
+      return 'Connection problem ('+(t||'unknown')+'). Try again.';
+    }
     function hostGame(){
       if(!peerReady()){ netStatus('Online play needs the game page open on the web (the connection library did not load here). Solo still works.'); return; }
       if(peer){ try{ peer.destroy(); }catch(e){} }
       var code=makeCode();
       MODE='host'; myIdx=0; netConnected=false; conns={}; remoteInputs={}; refreshNames(); newGame();
-      peer=new window.Peer('eggthieves-'+code);
+      peer=new window.Peer('eggthieves-'+code,PEER_OPTS);
       peer.on('open',function(){ netStatus('Your room code is '+code+'. Tell your friends to open the game, type the code, and press Join. Waiting...'); });
       peer.on('connection',function(c){
         var idx=assignIdx();
         if(idx<0){ c.close(); return; }
         wireHostConn(c, idx);
       });
-      peer.on('error',function(){ netStatus('Could not create the room. Try again.'); });
+      peer.on('error',function(err){ netStatus(peerErrorText(err)); });
     }
     function joinGame(){
       if(!peerReady()){ netStatus('Online play needs the game page open on the web (the connection library did not load here). Solo still works.'); return; }
@@ -805,12 +833,16 @@
       if(!code){ netStatus('Type the room code first, then press Join.'); return; }
       if(peer){ try{ peer.destroy(); }catch(e){} }
       MODE='guest'; myIdx=1; netConnected=false; refreshNames();
-      peer=new window.Peer();
+      peer=new window.Peer(undefined,PEER_OPTS);
       peer.on('open',function(){
         netStatus('Joining room '+code+'...');
         wireConn(peer.connect('eggthieves-'+code,{reliable:true}));
+        // never leave the guest staring at "Joining..." forever
+        setTimeout(function(){
+          if(MODE==='guest' && !netConnected) netStatus('Still not connected after 20 seconds. The two devices could not reach each other. Try both devices on the same WiFi, then refresh both pages and try again.');
+        },20000);
       });
-      peer.on('error',function(){ netStatus('Could not join. Check the code: the host must be waiting with that exact code.'); });
+      peer.on('error',function(err){ netStatus(peerErrorText(err)); });
     }
     function drawBlock(x,y,w,h,rot){
       ctx.save(); ctx.translate(x,y); ctx.rotate(rot||0);
