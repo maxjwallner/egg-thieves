@@ -99,7 +99,7 @@
       </div>
     </div>
   </div>
-  <div id="et-help">Throw: press, swipe toward the gate, let go. Swipe in an arc for a curve throw. Run: hold WASD / arrow keys, or press and hold on the field.</div>
+  <div id="et-help">Throw: press, swipe toward the gate, let go. Swipe in an arc for a curve throw. Run: WASD / arrow keys, or press anywhere and drag like a thumb stick.</div>
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script>
   (function(){
@@ -117,6 +117,11 @@
     function teamName(t){ return t===0?'Blue':'Orange'; }
     var S;
     var keys={}, pointer={x:440,y:150,down:false};
+    // Thumb stick running: press anywhere and drag. Where you press
+    // becomes the stick base, the drag direction is the run direction,
+    // and pushing further runs faster. Your thumb stays wherever it is
+    // comfortable instead of covering the player.
+    var stick={active:false,ax:0,ay:0,dx:0,dy:0};
     var last=0, cpuAimTimer=0, rebuildTimer=0;
     // Online play: MODE is 'solo', 'host' or 'guest'. The host runs the game
     // and sends the state to the guest about 20 times a second. The guest
@@ -125,7 +130,7 @@
     var MODE='solo', myIdx=0, peer=null, conn=null, netConnected=false, netTimer=0;
     var conns={}; // host only: player index -> that guest's connection
     var remoteInputs={}; // host only: player index -> last input received
-    function emptyInput(){ return {keys:{},pointer:{x:440,y:150,down:false}}; }
+    function emptyInput(){ return {keys:{},stick:{active:false,dx:0,dy:0}}; }
     function anyConn(){ for(var k in conns) if(conns[k]&&conns[k].open) return true; return false; }
     // Rebuild popup state: the defender picks blocks up by walking over
     // them, then stands on the gate spot to open the drag-and-drop popup.
@@ -157,7 +162,7 @@
       }
       return 'remote'; // guest never simulates
     }
-    function localInput(){ return {keys:keys,pointer:pointer}; }
+    function localInput(){ return {keys:keys,stick:{active:stick.active,dx:stick.dx,dy:stick.dy}}; }
     function inputFor(idx){ return controller(idx)==='remote'?(remoteInputs[idx]||emptyInput()):localInput(); }
 
     function startPos(i){
@@ -207,7 +212,7 @@
       }else{
         setMsg('Online game. '+(PPT===2?'Blue team':'Player 1')+' to throw.');
       }
-      setHelp('Throw: press, swipe toward the gate, let go. Swipe in an arc for a curve throw. Run: WASD / arrows or hold on the field. Keep running straight to build speed, sharp turns slow you down.'+(S.stealOn?' Basket stealing is ON: during a steal you can raid the other basket, but the owner can tag you inside their basket zone any time.':'')+(PPT===2?' Teams of 2: teammates take turns throwing, both teammates run in a steal, and both defenders rebuild together.':''));
+      setHelp('Throw: press, swipe toward the gate, let go. Swipe in an arc for a curve throw. Run: WASD / arrows, or press and drag anywhere like a thumb stick (push further to run faster). Keep running straight to build speed, sharp turns slow you down.'+(S.stealOn?' Basket stealing is ON: during a steal you can raid the other basket, but the owner can tag you inside their basket zone any time.':'')+(PPT===2?' Teams of 2: teammates take turns throwing, both teammates run in a steal, and both defenders rebuild together.':''));
       syncHud();
     }
     function setMsg(t){ S.msg=t; $('et-msg').textContent=t; }
@@ -364,7 +369,7 @@
         S.defenderFree=true;
         if(MODE!=='solo') setMsg('Gate rebuilt! '+teamName(S.defenderTeam)+' can now chase and tag.');
         else if(S.defenderTeam===1) setMsg('Gate rebuilt! The computer team is coming for you!');
-        else { setMsg('Gate rebuilt! Now run and tag a thief.'); setHelp('Run with keys or by holding on the field. Touch a thief to tag.'); }
+        else { setMsg('Gate rebuilt! Now run and tag a thief.'); setHelp('Run with keys or the thumb stick (press and drag). Touch a thief to tag.'); }
       }
     }
     function tagThief(tj){
@@ -414,7 +419,7 @@
       if(MODE!=='solo') setMsg(tagNote+teamName(S.turn)+' team to throw.');
       else if(S.turn===0) setMsg(tagNote+'Your throw. Flick toward the gate.');
       else setMsg(tagNote+'Computer is aiming its throw...');
-      setHelp('Throw: flick toward the gate. Run: WASD / arrows or hold on the field. Keep running straight to build speed, sharp turns slow you down.');
+      setHelp('Throw: flick toward the gate. Run: WASD / arrows, or press and drag anywhere like a thumb stick (push further to run faster). Keep running straight to build speed, sharp turns slow you down.');
     }
     function endGame(){
       popupOpen=false; $('et-popup').style.display='none';
@@ -515,10 +520,15 @@
       if(vx||vy){
         var d=Math.sqrt(vx*vx+vy*vy);
         velBlend(p,vx/d*base*1.55,vy/d*base*1.55,dt);
-      }else if(input.pointer&&input.pointer.down){
-        var dx=input.pointer.x-p.x, dy=input.pointer.y-p.y, dd=Math.sqrt(dx*dx+dy*dy);
-        if(dd>10) velBlend(p,dx/dd*base*1.55,dy/dd*base*1.55,dt);
-        else dampStop(p,dt);
+      }else if(input.stick&&input.stick.active){
+        // thumb stick: drag direction is the run direction, and how
+        // far the stick is pushed sets the speed (full push = sprint,
+        // which is where momentum builds up)
+        var sx=input.stick.dx, sy=input.stick.dy, sl=Math.sqrt(sx*sx+sy*sy);
+        if(sl>10){
+          var mag=Math.min(1,sl/70);
+          velBlend(p,sx/sl*base*1.55*mag,sy/sl*base*1.55*mag,dt);
+        }else dampStop(p,dt);
       }else dampStop(p,dt);
       integrate(p,dt);
     }
@@ -701,7 +711,7 @@
     function sendGuestInput(){
       if(!conn||!conn.open) return;
       var k={}; for(var key in keys) k[key]=keys[key];
-      conn.send({type:'input',keys:k,pointer:{x:pointer.x,y:pointer.y,down:pointer.down}});
+      conn.send({type:'input',keys:k,stick:{active:stick.active,dx:stick.dx,dy:stick.dy}});
     }
     function hostBroadcast(){
       var snap=snapshot();
@@ -709,7 +719,7 @@
     }
     function handleGuestData(data, idx){
       if(!data) return;
-      if(data.type==='input'){ remoteInputs[idx]={keys:data.keys||{},pointer:data.pointer||{x:440,y:150,down:false}}; }
+      if(data.type==='input'){ remoteInputs[idx]={keys:data.keys||{},stick:data.stick||{active:false,dx:0,dy:0}}; }
       else if(data.type==='throw'){
         if(S.phase==='aim' && S.thrower===idx && !S.over && typeof data.vx==='number' && typeof data.vy==='number')
           throwFlick(S.p[idx],Math.atan2(data.vy,data.vx),Math.sqrt(data.vx*data.vx+data.vy*data.vy),data.spin||0);
@@ -904,6 +914,17 @@
           if(p.carryStolen){ ctx.fillStyle=TEAM_COLORS[S.defenderTeam][0]; ctx.beginPath(); ctx.arc(p.x,p.y-30,4.5,0,7); ctx.fill(); } }
         if(S.phase==='steal' && S.defenderTeam>=0 && teamOf(j)===S.defenderTeam && !S.defenderFree){ var cc=carriedBy(j); for(var bc=0;bc<cc;bc++) drawBlock(p.x-14+bc*14,p.y-30,16,7,0.3); }
       }
+      // the thumb stick, drawn where the player's thumb actually is:
+      // a base ring at the press point and a knob showing the drag
+      if(stick.active){
+        var sl2=Math.sqrt(stick.dx*stick.dx+stick.dy*stick.dy);
+        var kx=stick.ax, ky=stick.ay;
+        if(sl2>0){ var cl=Math.min(sl2,56); kx=stick.ax+stick.dx/sl2*cl; ky=stick.ay+stick.dy/sl2*cl; }
+        ctx.beginPath(); ctx.arc(stick.ax,stick.ay,56,0,7); ctx.fillStyle='rgba(255,255,255,.13)'; ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(kx,ky,24,0,7); ctx.fillStyle='rgba(255,255,255,.38)'; ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.stroke();
+      }
     }
     function loop(ts){
       var dt=Math.min(0.033,(ts-last)/1000||0.016); last=ts;
@@ -920,6 +941,7 @@
     }
     cv.addEventListener('pointermove',function(ev){
       var pos=canvasPos(ev); pointer.x=pos.x; pointer.y=pos.y;
+      if(stick.active){ stick.dx=pos.x-stick.ax; stick.dy=pos.y-stick.ay; }
       if(flickActive){
         flickSamples.push({x:pos.x,y:pos.y,t:Date.now()});
         if(flickSamples.length>120) flickSamples.shift();
@@ -932,9 +954,14 @@
       if(S.phase==='aim' && S.thrower===myIdx && (MODE!=='guest'||netConnected)){
         flickActive=true; flickSamples=[{x:pos.x,y:pos.y,t:Date.now()}];
       }
+      // while running is happening, pressing anywhere plants the
+      // thumb stick there; dragging from there steers the player
+      if(S.phase==='steal' || S.phase==='throw'){
+        stick.active=true; stick.ax=pos.x; stick.ay=pos.y; stick.dx=0; stick.dy=0;
+      }
     });
-    cv.addEventListener('pointerup',function(){ finishFlick(); });
-    window.addEventListener('pointerup',function(){ pointer.down=false; finishFlick(); });
+    cv.addEventListener('pointerup',function(){ stick.active=false; finishFlick(); });
+    window.addEventListener('pointerup',function(){ pointer.down=false; stick.active=false; finishFlick(); });
     window.addEventListener('keydown',function(ev){ keys[ev.key.toLowerCase()]=true; if(['arrowup','arrowdown','arrowleft','arrowright',' '].indexOf(ev.key.toLowerCase())>=0) ev.preventDefault(); });
     window.addEventListener('keyup',function(ev){ keys[ev.key.toLowerCase()]=false; });
     $('et-new').addEventListener('click',function(){
