@@ -121,11 +121,13 @@
     // becomes the stick base, the drag direction is the run direction,
     // and pushing further runs faster. Your thumb stays wherever it is
     // comfortable instead of covering the player. The base is not
-    // fixed: when your finger changes direction, that turn point
-    // becomes the new base, so turns are measured fresh from there
-    // instead of dragging back across the old base.
+    // fixed either: when you push past the rim, the base slides along
+    // with your thumb, so the pull stays at the rim and the direction
+    // can swing smoothly as you turn. Nothing ever resets to zero,
+    // so a small veer stays a small veer instead of snapping into a
+    // sharp turn the way a hard re-anchor did.
     var stick={active:false,ax:0,ay:0,dx:0,dy:0};
-    var stickHist=[];
+    var STICK_R=56;
     var last=0, cpuAimTimer=0, rebuildTimer=0;
     // Online play: MODE is 'solo', 'host' or 'guest'. The host runs the game
     // and sends the state to the guest about 20 times a second. The guest
@@ -216,7 +218,7 @@
       }else{
         setMsg('Online game. '+(PPT===2?'Blue team':'Player 1')+' to throw.');
       }
-      setHelp('Throw: press, swipe toward the gate, let go. Swipe in an arc for a curve throw. Run: WASD / arrows, or press and drag anywhere like a thumb stick (push further to run faster; the stick re-centers when you change direction). Keep running straight to build speed, sharp turns slow you down.'+(S.stealOn?' Basket stealing is ON: during a steal you can raid the other basket, but the owner can tag you inside their basket zone any time.':'')+(PPT===2?' Teams of 2: teammates take turns throwing, both teammates run in a steal, and both defenders rebuild together.':''));
+      setHelp('Throw: press, swipe toward the gate, let go. Swipe in an arc for a curve throw. Run: WASD / arrows, or press and drag anywhere like a thumb stick (push further to run faster; the base slides along with your thumb). Keep running straight to build speed, sharp turns slow you down.'+(S.stealOn?' Basket stealing is ON: during a steal you can raid the other basket, but the owner can tag you inside their basket zone any time.':'')+(PPT===2?' Teams of 2: teammates take turns throwing, both teammates run in a steal, and both defenders rebuild together.':''));
       syncHud();
     }
     function setMsg(t){ S.msg=t; $('et-msg').textContent=t; }
@@ -423,7 +425,7 @@
       if(MODE!=='solo') setMsg(tagNote+teamName(S.turn)+' team to throw.');
       else if(S.turn===0) setMsg(tagNote+'Your throw. Flick toward the gate.');
       else setMsg(tagNote+'Computer is aiming its throw...');
-      setHelp('Throw: flick toward the gate. Run: WASD / arrows, or press and drag anywhere like a thumb stick (push further to run faster; the stick re-centers when you change direction). Keep running straight to build speed, sharp turns slow you down.');
+      setHelp('Throw: flick toward the gate. Run: WASD / arrows, or press and drag anywhere like a thumb stick (push further to run faster; the base slides along with your thumb). Keep running straight to build speed, sharp turns slow you down.');
     }
     function endGame(){
       popupOpen=false; $('et-popup').style.display='none';
@@ -530,7 +532,7 @@
         // which is where momentum builds up)
         var sx=input.stick.dx, sy=input.stick.dy, sl=Math.sqrt(sx*sx+sy*sy);
         if(sl>10){
-          var mag=Math.min(1,sl/70);
+          var mag=Math.min(1,sl/56);
           velBlend(p,sx/sl*base*1.55*mag,sy/sl*base*1.55*mag,dt);
         }else dampStop(p,dt);
       }else dampStop(p,dt);
@@ -923,8 +925,8 @@
       if(stick.active){
         var sl2=Math.sqrt(stick.dx*stick.dx+stick.dy*stick.dy);
         var kx=stick.ax, ky=stick.ay;
-        if(sl2>0){ var cl=Math.min(sl2,56); kx=stick.ax+stick.dx/sl2*cl; ky=stick.ay+stick.dy/sl2*cl; }
-        ctx.beginPath(); ctx.arc(stick.ax,stick.ay,56,0,7); ctx.fillStyle='rgba(255,255,255,.13)'; ctx.fill();
+        if(sl2>0){ var cl=Math.min(sl2,STICK_R); kx=stick.ax+stick.dx/sl2*cl; ky=stick.ay+stick.dy/sl2*cl; }
+        ctx.beginPath(); ctx.arc(stick.ax,stick.ay,STICK_R,0,7); ctx.fillStyle='rgba(255,255,255,.13)'; ctx.fill();
         ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=2; ctx.stroke();
         ctx.beginPath(); ctx.arc(kx,ky,24,0,7); ctx.fillStyle='rgba(255,255,255,.38)'; ctx.fill();
         ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.stroke();
@@ -946,25 +948,17 @@
     cv.addEventListener('pointermove',function(ev){
       var pos=canvasPos(ev); pointer.x=pos.x; pointer.y=pos.y;
       if(stick.active){
-        var nowT=Date.now();
-        stickHist.push({x:pos.x,y:pos.y,t:nowT});
-        while(stickHist.length>2 && nowT-stickHist[0].t>200) stickHist.shift();
-        // the finger's movement direction over the last ~60 ms. A
-        // turn has to be caught at its start: the stick pull points
-        // the old way only while the new-direction offset is still
-        // small, and a held or wobbling finger moves less than the
-        // minimum over this window, so it never triggers this
-        var ref=stickHist[0];
-        for(var hi=0;hi<stickHist.length;hi++){ if(nowT-stickHist[hi].t<=65){ ref=stickHist[hi]; break; } }
-        var mvx=pos.x-ref.x, mvy=pos.y-ref.y, ml=Math.sqrt(mvx*mvx+mvy*mvy);
-        var svx=pos.x-stick.ax, svy=pos.y-stick.ay, sl=Math.sqrt(svx*svx+svy*svy);
-        // moving in a clearly different direction than the stick is
-        // pointing? Then this turn point becomes the new base and
-        // the drag is measured fresh from here
-        if(ml>=8 && sl>=20 && (mvx*svx+mvy*svy)/(ml*sl)<0.45){
-          stick.ax=pos.x; stick.ay=pos.y;
-        }
         stick.dx=pos.x-stick.ax; stick.dy=pos.y-stick.ay;
+        var sl=Math.sqrt(stick.dx*stick.dx+stick.dy*stick.dy);
+        if(sl>STICK_R){
+          // pushed past the rim: slide the base along with the
+          // thumb so the pull stays at the rim. The direction can
+          // now rotate as the thumb moves, gently for a small veer
+          // and quickly for a big turn, without ever snapping
+          stick.ax=pos.x-stick.dx/sl*STICK_R;
+          stick.ay=pos.y-stick.dy/sl*STICK_R;
+          stick.dx=pos.x-stick.ax; stick.dy=pos.y-stick.ay;
+        }
       }
       if(flickActive){
         flickSamples.push({x:pos.x,y:pos.y,t:Date.now()});
@@ -982,7 +976,6 @@
       // thumb stick there; dragging from there steers the player
       if(S.phase==='steal' || S.phase==='throw'){
         stick.active=true; stick.ax=pos.x; stick.ay=pos.y; stick.dx=0; stick.dy=0;
-        stickHist=[{x:pos.x,y:pos.y,t:Date.now()}];
       }
     });
     cv.addEventListener('pointerup',function(){ stick.active=false; finishFlick(); });
