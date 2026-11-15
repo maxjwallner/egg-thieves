@@ -920,17 +920,8 @@
           if(p.carryStolen){ ctx.fillStyle=TEAM_COLORS[S.defenderTeam][0]; ctx.beginPath(); ctx.arc(p.x,p.y-30,4.5,0,7); ctx.fill(); } }
         if(S.phase==='steal' && S.defenderTeam>=0 && teamOf(j)===S.defenderTeam && !S.defenderFree){ var cc=carriedBy(j); for(var bc=0;bc<cc;bc++) drawBlock(p.x-14+bc*14,p.y-30,16,7,0.3); }
       }
-      // the thumb stick, drawn where the player's thumb actually is:
-      // a base ring at the press point and a knob showing the drag
-      if(stick.active){
-        var sl2=Math.sqrt(stick.dx*stick.dx+stick.dy*stick.dy);
-        var kx=stick.ax, ky=stick.ay;
-        if(sl2>0){ var cl=Math.min(sl2,STICK_R); kx=stick.ax+stick.dx/sl2*cl; ky=stick.ay+stick.dy/sl2*cl; }
-        ctx.beginPath(); ctx.arc(stick.ax,stick.ay,STICK_R,0,7); ctx.fillStyle='rgba(255,255,255,.13)'; ctx.fill();
-        ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=2; ctx.stroke();
-        ctx.beginPath(); ctx.arc(kx,ky,24,0,7); ctx.fillStyle='rgba(255,255,255,.38)'; ctx.fill();
-        ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.stroke();
-      }
+      // the thumb stick is not drawn: the controls are intuitive
+      // enough without a ring and knob on the field (Max, Nov 15)
     }
     function loop(ts){
       var dt=Math.min(0.033,(ts-last)/1000||0.016); last=ts;
