@@ -130,10 +130,14 @@
     var STICK_R=56;
     var last=0, cpuAimTimer=0, rebuildTimer=0;
     // Online play: MODE is 'solo', 'host' or 'guest'. The host runs the game
-    // and sends the state to the guest about 20 times a second. The guest
+    // and sends the state to the guest 30 times a second. The guest
     // sends back its keys, pointer and clicks. Player 0 is the host / solo
     // player, player 1 is the computer in solo, or the guest online.
     var MODE='solo', myIdx=0, peer=null, conn=null, netConnected=false, netTimer=0;
+    // guest-side smoothing: the host's latest word on where each
+    // player is (with velocity and arrival time). The guest renders
+    // from this instead of jumping between snapshots.
+    var netP=[];
     var conns={}; // host only: player index -> that guest's connection
     var remoteInputs={}; // host only: player index -> last input received
     function emptyInput(){ return {keys:{},stick:{active:false,dx:0,dy:0}}; }
@@ -701,7 +705,22 @@
     }
     function applySnapshot(snap){
       var keepMsg=S.msg;
+      // remember where players are currently drawn, so the new
+      // snapshot does not teleport them on screen: the guest step
+      // glides them to the host's positions instead (far jumps,
+      // like a tag sending a thief home, still snap instantly)
+      var prev=(MODE==='guest' && S && S.p) ? S.p.map(function(pl){return {x:pl.x,y:pl.y};}) : null;
       for(var k in snap) S[k]=snap[k];
+      if(MODE==='guest'){
+        for(var i=0;i<S.p.length;i++){
+          var sp=S.p[i];
+          netP[i]={x:sp.x,y:sp.y,vx:sp.vx,vy:sp.vy,t:Date.now()};
+          if(prev && prev[i]){
+            var pdx=sp.x-prev[i].x, pdy=sp.y-prev[i].y;
+            if(pdx*pdx+pdy*pdy<140*140){ sp.x=prev[i].x; sp.y=prev[i].y; }
+          }
+        }
+      }
       if(snap.ppt) PPT=snap.ppt;
       S.log.vx=0; S.log.vy=0; S.log.dist=0;
       syncHud();
@@ -712,6 +731,39 @@
         if(S.phase==='steal' && teamOf(myIdx)===S.defenderTeam && !S.defenderFree) setHelp('Run over the fallen blocks to pick them up, then stand on the glowing gate spot in the middle to rebuild.');
         else if(S.phase==='steal' && teamOf(myIdx)===S.thiefTeam) setHelp('Your team is stealing. Run to the eggs, grab one, bring it home, repeat.');
         else if(S.phase==='aim') setHelp(S.thrower===myIdx?'Your throw. Flick toward the gate.':'Waiting for the throw.');
+      }
+    }
+    // Guest-side motion between snapshots. The other players glide
+    // toward where the host says they are now (their snapshot
+    // position plus their velocity over the time since it landed),
+    // which turns 30 snapshots a second into fluid motion instead
+    // of visible steps. The guest's own player is predicted: it
+    // runs the same movement code at the same speeds the host uses,
+    // so it answers the stick instantly, and the host's word pulls
+    // it gently back when they disagree. A big disagreement (a tag
+    // sending the thief home, a turn reset) snaps straight over.
+    function guestStep(dt){
+      if(!S||!S.p) return;
+      var now=Date.now();
+      for(var i=0;i<S.p.length;i++){
+        var p=S.p[i], n=netP[i];
+        if(!n) continue;
+        var age=Math.min(0.25,(now-n.t)/1000);
+        var ex=n.x+n.vx*age, ey=n.y+n.vy*age;
+        var dx=ex-p.x, dy=ey-p.y, d=Math.sqrt(dx*dx+dy*dy);
+        if(i===myIdx && myIdx>=0){
+          if(S.phase==='steal' && !S.over && !p.out){
+            var base=teamOf(i)===S.thiefTeam?232:(S.defenderFree?248:240);
+            humanMove(p,base,dt,localInput());
+            dx=ex-p.x; dy=ey-p.y; d=Math.sqrt(dx*dx+dy*dy);
+          }
+          if(d>90){ p.x=ex; p.y=ey; p.vx=n.vx; p.vy=n.vy; }
+          else { p.x+=dx*Math.min(1,dt*7); p.y+=dy*Math.min(1,dt*7); }
+        }else{
+          if(d>140){ p.x=ex; p.y=ey; }
+          else { p.x+=dx*Math.min(1,dt*8); p.y+=dy*Math.min(1,dt*8); }
+          p.vx=n.vx; p.vy=n.vy;
+        }
       }
     }
     function sendGuestInput(){
@@ -957,10 +1009,10 @@
     }
     function loop(ts){
       var dt=Math.min(0.033,(ts-last)/1000||0.016); last=ts;
-      update(dt); draw(); checkPopupTrigger();
+      update(dt); if(MODE==='guest') guestStep(dt); draw(); checkPopupTrigger();
       if(MODE!=='solo' && netConnected){
         netTimer+=dt;
-        if(netTimer>=0.05){ netTimer=0; if(MODE==='host') hostBroadcast(); else sendGuestInput(); }
+        if(netTimer>=0.0333){ netTimer=0; if(MODE==='host') hostBroadcast(); else sendGuestInput(); }
       }
       requestAnimationFrame(loop);
     }
