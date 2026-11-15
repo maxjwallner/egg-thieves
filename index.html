@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Egg Thieves</title>
+<style>
+  :root{
+    --hatch-widget-text:#1a1d21;
+    --hatch-widget-fg:#1a1d21;
+    --hatch-widget-surface:#ffffff;
+    --hatch-widget-border:#d4d7dc;
+    --hatch-widget-accent:#2563eb;
+    --hatch-widget-on-accent:#ffffff;
+    --hatch-widget-muted:#5f6b7a;
+    --hatch-widget-shadow:rgba(0,0,0,.25);
+  }
+  html,body{margin:0;padding:0}
+  body{padding:10px;background:#e9efe9;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+</style>
+</head>
+<body>
+<div id="et-wrap" style="box-sizing:border-box;max-width:920px;margin:0 auto;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:var(--hatch-widget-text);">
+  <style>
+    #et-wrap *{box-sizing:border-box}
+    #et-hud{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .et-chip{background:var(--hatch-widget-surface);border:1px solid var(--hatch-widget-border);border-radius:999px;padding:5px 12px;font-size:14px;font-weight:600}
+    .et-chip.blue{color:#2563eb}.et-chip.orange{color:#ea580c}
+    #et-msg{font-size:15px;font-weight:700;text-align:center;margin:4px 0 8px;min-height:22px}
+    #et-help{font-size:13px;color:var(--hatch-widget-muted);text-align:center;margin-top:8px;min-height:18px}
+    #et-canvas{display:block;width:100%;height:auto;background:#3e9c4f;border-radius:12px;border:2px solid var(--hatch-widget-border);touch-action:none;cursor:crosshair}
+    #et-new{background:var(--hatch-widget-accent);color:var(--hatch-widget-on-accent);border:none;border-radius:999px;padding:6px 16px;font-size:14px;font-weight:700;cursor:pointer}
+    #et-net{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;margin-bottom:8px}
+    .et-netbtn{background:var(--hatch-widget-surface);color:var(--hatch-widget-text);border:1px solid var(--hatch-widget-border);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer}
+    #et-code{width:110px;padding:6px 10px;font-size:13px;font-weight:700;text-transform:uppercase;border:1px solid var(--hatch-widget-border);border-radius:999px;background:var(--hatch-widget-surface);color:var(--hatch-widget-text)}
+    #et-net-status{font-size:13px;font-weight:600;color:var(--hatch-widget-muted);width:100%;text-align:center;min-height:16px}
+    .et-set{font-size:13px;color:var(--hatch-widget-fg);display:flex;align-items:center;gap:4px;cursor:pointer}
+    #et-stage{position:relative}
+    /* Fullscreen / focus mode: the game takes over the whole window, the
+       field scales to fit inside it (no scrolling mid-round), and
+       everything above the field hides except the Exit fullscreen
+       button: scores and egg counts are drawn on the field itself, so
+       the field gets all the room there is. */
+    #et-wrap:fullscreen,#et-wrap.et-focus{background:#14351f;display:flex;flex-direction:column;padding:10px;overflow:hidden}
+    #et-wrap.et-focus{position:fixed;inset:0;z-index:99999}
+    #et-wrap:fullscreen #et-stage,#et-wrap.et-focus #et-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+    #et-wrap:fullscreen #et-canvas,#et-wrap.et-focus #et-canvas{width:auto;height:100%;max-width:100%}
+    #et-wrap:fullscreen #et-net,#et-wrap.et-focus #et-net,
+    #et-wrap:fullscreen #et-help,#et-wrap.et-focus #et-help,
+    #et-wrap:fullscreen #et-msg,#et-wrap.et-focus #et-msg,
+    #et-wrap:fullscreen #et-new,#et-wrap.et-focus #et-new,
+    #et-wrap:fullscreen #et-hud .et-chip,#et-wrap.et-focus #et-hud .et-chip{display:none}
+    #et-wrap:fullscreen #et-hud,#et-wrap.et-focus #et-hud{justify-content:flex-end;margin-bottom:6px}
+    #et-wrap:fullscreen,#et-wrap.et-focus,#et-stage{touch-action:none}
+    #et-popup{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:330px;max-width:92%;background:var(--hatch-widget-surface);border:2px solid var(--hatch-widget-border);border-radius:14px;box-shadow:0 10px 34px var(--hatch-widget-shadow);padding:14px;z-index:5}
+    #et-pop-title{font-size:16px;font-weight:800;text-align:center;margin-bottom:2px}
+    #et-pop-text{font-size:13px;color:var(--hatch-widget-muted);text-align:center;margin-bottom:10px}
+    #et-frame{position:relative;width:230px;height:180px;margin:0 auto 10px;border:2px dashed var(--hatch-widget-border);border-radius:10px}
+    .et-slot{position:absolute;border:2px dashed #a9743f;border-radius:4px;background:rgba(169,116,63,.12)}
+    .et-slot.filled{background:#a9743f;border-style:solid}
+    #et-slot-0{left:30px;bottom:12px;width:28px;height:96px}
+    #et-slot-1{right:30px;bottom:12px;width:28px;height:96px}
+    #et-slot-2{left:50%;top:12px;transform:translateX(-50%);width:150px;height:28px}
+    #et-tray{display:flex;gap:10px;justify-content:center;min-height:26px;margin-bottom:10px}
+    .et-piece{width:58px;height:20px;background:#a9743f;border:2px solid #6d4520;border-radius:4px;cursor:grab;touch-action:none;position:relative;z-index:6}
+  </style>
+  <div id="et-hud">
+    <span class="et-chip blue"><span id="et-n0">You</span>: <span id="et-s0">0</span> eggs</span>
+    <span class="et-chip">Eggs left: <span id="et-eggs">24</span></span>
+    <span class="et-chip orange"><span id="et-n1">Computer</span>: <span id="et-s1">0</span> eggs</span>
+    <button id="et-new" type="button">New game</button>
+    <button id="et-full" class="et-netbtn" type="button">Fullscreen</button>
+  </div>
+  <div id="et-net">
+    <button id="et-host" class="et-netbtn" type="button">Host online game</button>
+    <input id="et-code" type="text" placeholder="CODE" maxlength="6" aria-label="Room code">
+    <button id="et-join" class="et-netbtn" type="button">Join with code</button>
+    <label class="et-set"><input type="checkbox" id="et-steal" checked> Basket stealing</label>
+    <label class="et-set">Players per team:
+      <select id="et-teams" class="et-netbtn"><option value="1">1 (2 players)</option><option value="2">2 (4 players)</option></select>
+    </label>
+    <div id="et-net-status">Solo vs computer, or host a room and share the code.</div>
+  </div>
+  <div id="et-msg">Your throw. Flick toward the gate to throw the log.</div>
+  <div id="et-stage">
+    <canvas id="et-canvas" width="880" height="1280" tabindex="0"></canvas>
+    <div id="et-popup">
+      <div id="et-pop-title">Rebuild the gate</div>
+      <div id="et-pop-text">Drag each block into the gate outline. You can keep moving, walk out of the circle and this window closes itself.</div>
+      <div id="et-frame">
+        <div class="et-slot" id="et-slot-0"></div>
+        <div class="et-slot" id="et-slot-1"></div>
+        <div class="et-slot" id="et-slot-2"></div>
+      </div>
+      <div id="et-tray">
+        <div class="et-piece" id="et-piece-0"></div>
+        <div class="et-piece" id="et-piece-1"></div>
+        <div class="et-piece" id="et-piece-2"></div>
+      </div>
+    </div>
+  </div>
+  <div id="et-help">Throw: press, swipe toward the gate, let go. Swipe in an arc for a curve throw. Run: hold WASD / arrow keys, or press and hold on the field.</div>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script>
+  (function(){
+    var cv=document.getElementById('et-canvas'), ctx=cv.getContext('2d');
+    var W=880,H=1280;
+    var EGG={x:440,y:74}, GATE={x:440,y:640};
+    var ZONE_R=160; // guard zone radius around each home basket
+    var HOMES=[{x:84,y:1196},{x:796,y:1196}];
+    // Player colors by team and seat: darker for seat 0, lighter for 1.
+    var TEAM_COLORS=[['#2563eb','#38bdf8'],['#ea580c','#f59e0b']];
+    var PPT=1; // players per team: 1 is a 2 player game, 2 is a 4 player game
+    function teamOf(idx){ return Math.floor(idx/PPT); }
+    function slotOf(idx){ return idx%PPT; }
+    function colorOf(idx){ return TEAM_COLORS[teamOf(idx)][slotOf(idx)]; }
+    function teamName(t){ return t===0?'Blue':'Orange'; }
+    var S;
+    var keys={}, pointer={x:440,y:150,down:false};
+    var last=0, cpuAimTimer=0, rebuildTimer=0;
+    // Online play: MODE is 'solo', 'host' or 'guest'. The host runs the game
+    // and sends the state to the guest about 20 times a second. The guest
+    // sends back its keys, pointer and clicks. Player 0 is the host / solo
+    // player, player 1 is the computer in solo, or the guest online.
+    var MODE='solo', myIdx=0, peer=null, conn=null, netConnected=false, netTimer=0;
+    var conns={}; // host only: player index -> that guest's connection
+    var remoteInputs={}; // host only: player index -> last input received
+    function emptyInput(){ return {keys:{},pointer:{x:440,y:150,down:false}}; }
+    function anyConn(){ for(var k in conns) if(conns[k]&&conns[k].open) return true; return false; }
+    // Rebuild popup state: the defender picks blocks up by walking over
+    // them, then stands on the gate spot to open the drag-and-drop popup.
+    var popupOpen=false, dragIdx=-1, dragLast=null, slotFilled=[false,false,false];
+    var aiRebuildTimer=0;
+    // Flick throwing: while the thrower presses and drags, we record the
+    // pointer path. On release, the speed and direction of the last bit of
+    // the swipe becomes the throw, and how much the path bent becomes spin.
+    var flickActive=false, flickSamples=[];
+
+    function $(id){ return document.getElementById(id); }
+    function netStatus(t){ $('et-net-status').textContent=t; }
+    function refreshNames(){
+      var t0, t1;
+      if(PPT===2){
+        if(MODE==='solo'){ t0='Your team'; t1='Computer team'; }
+        else { t0='Blue team'+(teamOf(myIdx)===0?' (you)':''); t1='Orange team'+(teamOf(myIdx)===1?' (you)':''); }
+      }else if(MODE==='solo'){ t0='You'; t1='Computer'; }
+      else if(MODE==='host'){ t0='You (Player 1)'; t1='Guest (Player 2)'; }
+      else { t0='Host (Player 1)'; t1='You (Player 2)'; }
+      $('et-n0').textContent=t0; $('et-n1').textContent=t1;
+    }
+    function controller(idx){
+      if(MODE==='solo') return idx===0?'local':'ai';
+      if(MODE==='host'){
+        if(idx===0) return 'local';
+        var c=conns[idx];
+        return (c&&c.open)?'remote':'ai'; // an empty seat is played by the computer
+      }
+      return 'remote'; // guest never simulates
+    }
+    function localInput(){ return {keys:keys,pointer:pointer}; }
+    function inputFor(idx){ return controller(idx)==='remote'?(remoteInputs[idx]||emptyInput()):localInput(); }
+
+    function startPos(i){
+      var home=HOMES[teamOf(i)];
+      if(slotOf(i)===0) return {x:home.x,y:home.y-44};
+      return {x:home.x+(teamOf(i)===0?66:-66), y:home.y-44};
+    }
+    function resetPlayer(i){ var sp=startPos(i); S.p[i].x=sp.x; S.p[i].y=sp.y; S.p[i].vx=0; S.p[i].vy=0; }
+    function startTurn(team){
+      // Turns alternate between teams; teammates take turns throwing.
+      S.turn=team;
+      var slot=S.throwerSlot[team]%PPT; S.throwerSlot[team]++;
+      S.thrower=team*PPT+slot;
+      S.phase='aim'; cpuAimTimer=0;
+    }
+    function newGame(){
+      // Pre-game settings (by the online buttons): basket stealing and
+      // players per team. The host's settings rule an online game.
+      var sc=$('et-steal');
+      var stealSetting = MODE==='guest' ? (S?S.stealOn:true) : (!sc || sc.checked!==false);
+      var tc=$('et-teams');
+      var pptSetting = MODE==='guest' ? (S?S.ppt:1) : (tc && tc.value==='2' ? 2 : 1);
+      PPT=pptSetting;
+      if(MODE==='host'){
+        // guests whose seat no longer exists (teams got smaller) are
+        // told they are spectating this game
+        for(var ci in conns){
+          if(parseInt(ci,10)>=2*PPT){ var cc=conns[ci]; if(cc&&cc.open) cc.send({type:'welcome',idx:-1,ppt:PPT}); delete conns[ci]; }
+        }
+        netConnected=anyConn();
+      }
+      var players=[];
+      for(var pi=0;pi<2*PPT;pi++) players.push({x:0,y:0,vx:0,vy:0,carrying:false,carryStolen:false,aiSteal:false,aiCommitted:false,placeT:0,out:false});
+      S={phase:'aim', turn:0, thrower:0, throwerSlot:[0,0], thiefTeam:-1, defenderTeam:-1, defenderFree:false,
+         central:24, scores:[0,0], stealOn:stealSetting, ppt:PPT,
+         gateBroken:false, rebuilt:0,
+         fallen:[], log:{active:false,x:0,y:0,vx:0,vy:0,ang:0,dist:0},
+         p:players, over:false, msg:''};
+      for(var ri=0;ri<S.p.length;ri++) resetPlayer(ri);
+      cpuAimTimer=0; rebuildTimer=0; aiRebuildTimer=0;
+      startTurn(0);
+      popupOpen=false; dragIdx=-1; slotFilled=[false,false,false];
+      $('et-popup').style.display='none';
+      refreshNames();
+      if(MODE==='solo'){
+        setMsg('Your throw. Flick toward the gate to throw the log.');
+      }else{
+        setMsg('Online game. '+(PPT===2?'Blue team':'Player 1')+' to throw.');
+      }
+      setHelp('Throw: press, swipe toward the gate, let go. Swipe in an arc for a curve throw. Run: WASD / arrows or hold on the field. Keep running straight to build speed, sharp turns slow you down.'+(S.stealOn?' Basket stealing is ON: during a steal you can raid the other basket, but the owner can tag you inside their basket zone any time.':'')+(PPT===2?' Teams of 2: teammates take turns throwing, both teammates run in a steal, and both defenders rebuild together.':''));
+      syncHud();
+    }
+    function setMsg(t){ S.msg=t; $('et-msg').textContent=t; }
+    function setHelp(t){ $('et-help').textContent=t; }
+    function syncHud(){
+      $('et-s0').textContent=S.scores[0];
+      $('et-s1').textContent=S.scores[1];
+      $('et-eggs').textContent=S.central;
+    }
+    function dist(a,b){ var dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
+    // Momentum movement: players have a velocity. Running builds speed up
+    // to about 1.55x the base speed, sharp turns and reversals scrub speed
+    // off, and letting go of the controls brakes quickly. Long straight
+    // runs (the thief's whole job) end up fast; stop-start zigzag work
+    // (the defender collecting blocks) stays near base speed.
+    function velBlend(p,dvx,dvy,dt){
+      var sp=Math.sqrt(p.vx*p.vx+p.vy*p.vy), dsp=Math.sqrt(dvx*dvx+dvy*dvy), rate=3.0;
+      if(sp>30 && dsp>1){
+        var dot=(p.vx*dvx+p.vy*dvy)/(sp*dsp);
+        if(dot<0.25) rate=7.5; // turning hard against your momentum costs speed
+      }
+      var k=1-Math.exp(-rate*dt);
+      p.vx+=(dvx-p.vx)*k; p.vy+=(dvy-p.vy)*k;
+    }
+    function dampStop(p,dt){
+      var f=Math.exp(-5*dt); p.vx*=f; p.vy*=f;
+      if(Math.abs(p.vx)<3) p.vx=0;
+      if(Math.abs(p.vy)<3) p.vy=0;
+    }
+    function integrate(p,dt){
+      p.x+=p.vx*dt; p.y+=p.vy*dt;
+      if(p.x<20){ p.x=20; p.vx=0; } if(p.x>W-20){ p.x=W-20; p.vx=0; }
+      if(p.y<20){ p.y=20; p.vy=0; } if(p.y>H-20){ p.y=H-20; p.vy=0; }
+    }
+    function aiMove(p,target,base,dt){
+      var dx=target.x-p.x, dy=target.y-p.y, d=Math.sqrt(dx*dx+dy*dy);
+      if(d<4){ dampStop(p,dt); integrate(p,dt); return; }
+      // full speed on a long run, ease off when close so it can stop
+      var want=Math.min(base*1.55, Math.max(base*0.5, d*3.0));
+      velBlend(p,dx/d*want,dy/d*want,dt);
+      integrate(p,dt);
+    }
+    function throwFlick(from,angle,speed,spin){
+      // One throw, shared by human flicks, guest flicks and the computer.
+      // The log flies, then lands and tumbles: every bounce knocks it in a
+      // slightly random direction, like a real log, so even a throw that
+      // falls short can bounce and roll into the gate.
+      speed=Math.max(240,Math.min(1250,speed));
+      S.log={active:true,x:from.x,y:from.y,
+        vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
+        ang:0, spin:Math.max(-1,Math.min(1,spin||0)),
+        air:Math.max(0.22,Math.min(0.85,speed/1500)), bounces:0};
+      S.phase='throw';
+    }
+    function flickVelocity(samples){
+      // Speed and direction of the last 140 ms of the swipe.
+      if(samples.length<2) return null;
+      var lastS=samples[samples.length-1], firstS=lastS;
+      for(var i=samples.length-1;i>=0;i--){ if(lastS.t-samples[i].t<=140) firstS=samples[i]; else break; }
+      var dt=Math.max(16,lastS.t-firstS.t)/1000;
+      var vx=(lastS.x-firstS.x)/dt, vy=(lastS.y-firstS.y)/dt;
+      return {vx:vx,vy:vy,speed:Math.sqrt(vx*vx+vy*vy)};
+    }
+    function flickSpin(samples){
+      // How much the swipe path bent, summed over the whole drag. A big
+      // bend (a hook or a swirl) means a curve throw.
+      var total=0, prev=null;
+      for(var i=1;i<samples.length;i++){
+        var dx=samples[i].x-samples[i-1].x, dy=samples[i].y-samples[i-1].y;
+        if(Math.sqrt(dx*dx+dy*dy)<4) continue;
+        var a=Math.atan2(dy,dx);
+        if(prev!==null){
+          var d=a-prev;
+          while(d>Math.PI)d-=2*Math.PI;
+          while(d<-Math.PI)d+=2*Math.PI;
+          total+=d;
+        }
+        prev=a;
+      }
+      return Math.max(-1,Math.min(1,total/2.2));
+    }
+    function finishFlick(){
+      if(!flickActive) return;
+      flickActive=false;
+      var v=flickVelocity(flickSamples), spin=flickSpin(flickSamples);
+      flickSamples=[];
+      if(S.phase!=='aim'||S.thrower!==myIdx||S.over) return;
+      if(!v||v.speed<180){
+        if(MODE!=='guest'||netConnected) setHelp('Too gentle. Press, swipe toward the gate, and let go while your hand is still moving.');
+        return;
+      }
+      var speed=Math.max(260,Math.min(1250,v.speed*0.95));
+      var angle=Math.atan2(v.vy,v.vx);
+      if(MODE==='guest'){
+        if(conn&&conn.open) conn.send({type:'throw',vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,spin:spin});
+      }else{
+        throwFlick(S.p[myIdx],angle,speed,spin);
+      }
+    }
+    function breakGate(curveHit){
+      S.gateBroken=true; S.phase='steal'; S.thiefTeam=S.turn; S.defenderTeam=1-S.turn;
+      S.defenderFree=false; S.rebuilt=0; rebuildTimer=0; aiRebuildTimer=0; S.log.active=false;
+      popupOpen=false; slotFilled=[false,false,false]; $('et-popup').style.display='none';
+      S.fallen=[];
+      var spots;
+      if(curveHit){
+        // A curve throw does not just knock the gate over, it scatters the
+        // blocks in all directions, so the defender has a much longer
+        // pickup run. That is the reward for the harder throw.
+        spots=[];
+        for(var ci=0;ci<3;ci++){
+          var ca=Math.random()*Math.PI*2, cd=120+Math.random()*95;
+          spots.push({x:Math.max(64,Math.min(W-64,GATE.x+Math.cos(ca)*cd)),
+                      y:Math.max(120,Math.min(H-96,GATE.y+Math.sin(ca)*cd))});
+        }
+      }else{
+        spots=[{x:GATE.x-118,y:GATE.y+58},{x:GATE.x+104,y:GATE.y+84},{x:GATE.x-16,y:GATE.y+128}];
+      }
+      for(var i=0;i<3;i++) S.fallen.push({x:spots[i].x,y:spots[i].y,status:'field',carrier:-1});
+      // everyone starts from their own corner: the attacking team runs
+      // for the eggs, the defenders run to pick the fallen blocks up
+      for(var pp=0;pp<S.p.length;pp++){
+        var pl=S.p[pp];
+        pl.carrying=false; pl.carryStolen=false; pl.placeT=0; pl.out=false;
+        // computer thieves sometimes raid the other basket instead of
+        // the egg basket, when stealing is on and there is loot to take
+        pl.aiSteal = S.stealOn && S.scores[S.defenderTeam]>0 && Math.random()<0.5;
+        pl.aiCommitted=false;
+        resetPlayer(pp);
+      }
+      var curveNote=curveHit?' Curve throw, the blocks scattered everywhere!':'';
+      if(MODE!=='solo'){
+        setMsg(teamName(S.thiefTeam)+' team broke the gate!'+curveNote+' '+teamName(S.defenderTeam)+' must pick up the blocks and rebuild, then chase.');
+        setHelp(teamOf(myIdx)===S.thiefTeam?'Your team is stealing. Run: grab an egg up top, bring it home, repeat.':(teamOf(myIdx)===S.defenderTeam?'Your team is defending. Run over the 3 fallen blocks to pick them up, then stand on the glowing gate spot in the middle to rebuild.':''));
+      }else if(S.thiefTeam===0){
+        setMsg((curveHit?'Curve throw! The blocks scattered everywhere. ':'Gate broken! ')+'Run: grab an egg up top, bring it home, repeat.');
+        setHelp('The computer team has to pick up the fallen blocks and rebuild the gate before it can chase you.');
+      }else{
+        setMsg('The computer team broke the gate!'+curveNote+' Pick up the blocks, then rebuild at the gate spot.');
+        setHelp('Run over the 3 fallen blocks to pick them up. Then step into the glowing circle in the middle and drag the blocks back into place. You can keep moving while the window is open, it closes when you walk out of the circle. Your teammate helps rebuild too.');
+      }
+      syncHud();
+    }
+    function carriedCount(){ var n=0; for(var i=0;i<S.fallen.length;i++) if(S.fallen[i].status==='carried') n++; return n; }
+    function carriedBy(idx){ var n=0; for(var i=0;i<S.fallen.length;i++) if(S.fallen[i].status==='carried'&&S.fallen[i].carrier===idx) n++; return n; }
+    function placedCount(){ var n=0; for(var i=0;i<S.fallen.length;i++) if(S.fallen[i].status==='placed') n++; return n; }
+    function setBlockPlaced(idx){
+      // Marks one block as placed in the gate. Used by the local popup,
+      // by computer defenders, and by the host when a guest's popup
+      // reports a placed block.
+      if(!S.fallen[idx]||S.fallen[idx].status==='placed') return;
+      S.fallen[idx].status='placed'; S.fallen[idx].carrier=-1; S.rebuilt=placedCount();
+      if(S.rebuilt>=3 && !S.defenderFree){
+        S.defenderFree=true;
+        if(MODE!=='solo') setMsg('Gate rebuilt! '+teamName(S.defenderTeam)+' can now chase and tag.');
+        else if(S.defenderTeam===1) setMsg('Gate rebuilt! The computer team is coming for you!');
+        else { setMsg('Gate rebuilt! Now run and tag a thief.'); setHelp('Run with keys or by holding on the field. Touch a thief to tag.'); }
+      }
+    }
+    function tagThief(tj){
+      // Tags are individual: the tagged thief drops their egg (back to
+      // the big basket, or back to its owner's basket if it was stolen),
+      // goes back to their corner, and is out for the rest of this
+      // steal. The steal only ends when every thief has been tagged.
+      var pl=S.p[tj], stolenBack=false;
+      if(pl.carrying){
+        if(pl.carryStolen){ S.scores[S.defenderTeam]++; stolenBack=true; }
+        else S.central++;
+        pl.carrying=false; pl.carryStolen=false;
+      }
+      pl.out=true;
+      resetPlayer(tj);
+      syncHud();
+      var left=0;
+      for(var i=0;i<S.p.length;i++) if(teamOf(i)===S.thiefTeam && !S.p[i].out) left++;
+      if(left<=0){ endSteal(true, stolenBack); return true; }
+      var eggNote = stolenBack ? 'Tagged! The stolen egg went back to its basket. ' : 'Tagged! ';
+      if(MODE!=='solo') setMsg(eggNote+(left===1?'One '+teamName(S.thiefTeam)+' thief is still running.':left+' '+teamName(S.thiefTeam)+' thieves still running.'));
+      else if(S.thiefTeam===0){
+        if(tj===myIdx) setMsg(eggNote+'You are out. Your teammate is still running!');
+        else setMsg(eggNote+'Your teammate is out. You are still running!');
+      }
+      else setMsg(eggNote+(left===1?'One computer thief is still running.':'The computer thieves are still running.'));
+      return false;
+    }
+    function endSteal(tagged, stolenBack){
+      popupOpen=false; $('et-popup').style.display='none';
+      // Safety net: any egg still being carried when the steal ends
+      // goes back where it came from (normally none are, because each
+      // thief drops theirs when they are tagged).
+      for(var i=0;i<S.p.length;i++){
+        var pl=S.p[i];
+        if(pl.carrying){
+          if(pl.carryStolen) S.scores[S.defenderTeam]++; else S.central++;
+          pl.carrying=false; pl.carryStolen=false;
+        }
+        pl.out=false;
+      }
+      S.gateBroken=false; S.rebuilt=0; S.fallen=[]; S.thiefTeam=-1; S.defenderTeam=-1; S.defenderFree=false;
+      for(var r=0;r<S.p.length;r++) resetPlayer(r);
+      startTurn(1-S.turn);
+      syncHud();
+      var tagNote = tagged ? (stolenBack?'Tagged! The stolen egg went back to its basket. ':'Tagged! The carried egg went back. ') : '';
+      if(MODE!=='solo') setMsg(tagNote+teamName(S.turn)+' team to throw.');
+      else if(S.turn===0) setMsg(tagNote+'Your throw. Flick toward the gate.');
+      else setMsg(tagNote+'Computer is aiming its throw...');
+      setHelp('Throw: flick toward the gate. Run: WASD / arrows or hold on the field. Keep running straight to build speed, sharp turns slow you down.');
+    }
+    function endGame(){
+      popupOpen=false; $('et-popup').style.display='none';
+      S.phase='over'; S.over=true;
+      var tie=S.scores[0]===S.scores[1], hi=Math.max(S.scores[0],S.scores[1]), lo=Math.min(S.scores[0],S.scores[1]), w;
+      if(MODE!=='solo'){
+        w=tie?('It is a tie, '+S.scores[0]+' to '+S.scores[1]+'.'):(teamName(S.scores[0]>S.scores[1]?0:1)+' team wins '+hi+' to '+lo+'!');
+      }else if(PPT===2){
+        w=tie?('It is a tie, '+S.scores[0]+' to '+S.scores[1]+'.'):(S.scores[0]>S.scores[1]?'Your team wins '+hi+' to '+lo+'!':'Computer team wins '+hi+' to '+lo+'.');
+      }else{
+        w=tie?('It is a tie, '+S.scores[0]+' to '+S.scores[1]+'.'):(S.scores[0]>S.scores[1]?'You win '+hi+' to '+lo+'!':'Computer wins '+hi+' to '+lo+'.');
+      }
+      setMsg('Game over. '+w);
+      setHelp('Press New game to play again.');
+      syncHud();
+    }
+    function missThrow(){
+      S.log.active=false;
+      for(var i=0;i<S.p.length;i++) resetPlayer(i);
+      startTurn(1-S.turn);
+      if(MODE!=='solo') setMsg('Missed. '+teamName(S.turn)+' team to throw.');
+      else setMsg(S.turn===0?'Missed. Your throw. Flick toward the gate.':'Missed. Computer is aiming its throw...');
+    }
+    // ---- Drag-and-drop rebuild popup ----
+    function renderPopup(){
+      var placed=placedCount();
+      slotFilled=[false,false,false];
+      for(var s=0;s<placed;s++) slotFilled[s]=true;
+      for(var i=0;i<3;i++){
+        $('et-slot-'+i).className='et-slot'+(slotFilled[i]?' filled':'');
+        var piece=$('et-piece-'+i);
+        // the popup only offers the blocks YOU are carrying; a teammate
+        // standing in the circle sees their own blocks in their popup
+        piece.style.display=(S.fallen[i]&&S.fallen[i].status==='carried'&&S.fallen[i].carrier===myIdx)?'block':'none';
+        piece.style.transform=''; piece.style.zIndex=6;
+      }
+      var left=carriedBy(myIdx);
+      $('et-pop-text').textContent=left>0?('Drag each block into the gate outline. You can keep moving, walk out of the circle and this window closes itself.'):('You are not carrying a block right now. Your team has placed '+placed+' of 3. Walk out of the circle, run over a fallen block, then come back.');
+    }
+    function openPopup(){
+      if(popupOpen) return;
+      popupOpen=true; dragIdx=-1;
+      renderPopup();
+      $('et-popup').style.display='block';
+    }
+    function closePopup(){
+      popupOpen=false; dragIdx=-1;
+      $('et-popup').style.display='none';
+    }
+    function placePiece(idx,slotIdx){
+      slotFilled[slotIdx]=true;
+      $('et-slot-'+slotIdx).className='et-slot filled';
+      var piece=$('et-piece-'+idx);
+      piece.style.display='none'; piece.style.transform='';
+      if(MODE==='guest'){
+        // mirror it locally; the host confirms it in the next state update
+        S.fallen[idx].status='placed'; S.rebuilt=placedCount();
+        if(conn&&conn.open) conn.send({type:'blockPlaced',index:idx});
+      }else{
+        setBlockPlaced(idx);
+      }
+      if(placedCount()>=3){
+        $('et-pop-text').textContent='Gate rebuilt! Now go tag the thief!';
+        setTimeout(function(){ if(popupOpen) closePopup(); },450);
+      }else{
+        renderPopupPiecesOnly();
+      }
+    }
+    function renderPopupPiecesOnly(){
+      for(var i=0;i<3;i++){
+        var piece=$('et-piece-'+i);
+        if(S.fallen[i]&&S.fallen[i].status==='carried'&&S.fallen[i].carrier===myIdx){ piece.style.display='block'; piece.style.transform=''; }
+        else piece.style.display='none';
+        $('et-slot-'+i).className='et-slot'+(slotFilled[i]?' filled':'');
+      }
+    }
+    function checkPopupTrigger(){
+      // Only a defending player's own screen shows the popup. It opens
+      // when they step into the rebuild circle carrying blocks, they can
+      // keep moving while it is open, and it closes on its own when they
+      // walk out of the circle. No button, no latch: walk back in and it
+      // opens again. With teams, each defender gets their own popup with
+      // the blocks they personally carry, so teammates can drift in and
+      // out of the circle and rebuild together.
+      var iAmDefender = S.defenderTeam>=0 && teamOf(myIdx)===S.defenderTeam && (MODE==='guest' || controller(myIdx)==='local');
+      if(!iAmDefender) { if(popupOpen) closePopup(); return; }
+      if(S.phase!=='steal'||S.defenderFree||S.over){ if(popupOpen) closePopup(); return; }
+      var d=dist(S.p[myIdx],GATE);
+      if(popupOpen){ if(d>58) closePopup(); }
+      else if(d<46 && carriedBy(myIdx)>0) openPopup();
+    }
+    function humanMove(p,base,dt,input){
+      var k=input.keys||{}, vx=0, vy=0;
+      if(k['w']||k['arrowup']) vy-=1;
+      if(k['s']||k['arrowdown']) vy+=1;
+      if(k['a']||k['arrowleft']) vx-=1;
+      if(k['d']||k['arrowright']) vx+=1;
+      if(vx||vy){
+        var d=Math.sqrt(vx*vx+vy*vy);
+        velBlend(p,vx/d*base*1.55,vy/d*base*1.55,dt);
+      }else if(input.pointer&&input.pointer.down){
+        var dx=input.pointer.x-p.x, dy=input.pointer.y-p.y, dd=Math.sqrt(dx*dx+dy*dy);
+        if(dd>10) velBlend(p,dx/dd*base*1.55,dy/dd*base*1.55,dt);
+        else dampStop(p,dt);
+      }else dampStop(p,dt);
+      integrate(p,dt);
+    }
+    function update(dt){
+      if(S.over) return;
+      if(MODE==='guest') return; // host sends the state, guest only renders
+      if(MODE==='host' && !netConnected) return; // wait for the guest
+      if(S.phase==='aim' && controller(S.thrower)==='ai'){
+        cpuAimTimer+=dt;
+        if(cpuAimTimer>0.9){
+          // The computer flicks too: most throws are aimed at the gate,
+          // some fall short and have to bounce in, some are curve throws
+          // with a bigger aim error.
+          var from=S.p[S.thrower];
+          var base=Math.atan2(GATE.y-from.y,GATE.x-from.x), roll=Math.random();
+          var ang=base+(Math.random()*0.09-0.045), spd=1010+Math.random()*130, spin=0;
+          if(roll<0.24){ spd=630+Math.random()*130; ang=base+(Math.random()*0.18-0.09); }
+          else if(roll<0.46){ spin=(Math.random()<0.5?-1:1)*(0.45+Math.random()*0.45); ang=base+(Math.random()*0.34-0.17); spd=1030+Math.random()*160; }
+          throwFlick(from,ang,spd,spin);
+        }
+      }
+      if(S.phase==='throw' && S.log.active){
+        var L=S.log;
+        var sp=Math.sqrt(L.vx*L.vx+L.vy*L.vy);
+        if(sp>1){
+          // spin bends the flight sideways, like a curveball
+          var px=-L.vy/sp, py=L.vx/sp;
+          L.vx+=px*L.spin*660*dt;
+          L.vy+=py*L.spin*660*dt;
+          var dragF=Math.exp(-0.16*dt); L.vx*=dragF; L.vy*=dragF;
+        }
+        L.x+=L.vx*dt; L.y+=L.vy*dt; L.ang+=dt*(7+Math.abs(L.spin)*11);
+        if(!S.gateBroken && dist(L,GATE)<52){ breakGate(Math.abs(L.spin)>0.35); return; }
+        L.air-=dt;
+        if(L.air<=0){
+          sp=Math.sqrt(L.vx*L.vx+L.vy*L.vy);
+          if(sp<75||L.bounces>=4){ missThrow(); }
+          else{
+            // bounce like a log, not a ball: random knock sideways,
+            // a chunk of speed gone, then a short tumble onward. A short
+            // throw can still bounce and roll the rest of the way in.
+            var jitter=(Math.random()*0.95-0.475), jc=Math.cos(jitter), js=Math.sin(jitter);
+            var nvx=(L.vx*jc-L.vy*js)*0.55, nvy=(L.vx*js+L.vy*jc)*0.55;
+            L.vx=nvx; L.vy=nvy; L.bounces++; L.air=0.15+Math.random()*0.1; L.spin*=0.5;
+          }
+        }
+        if(L.x<-40||L.x>W+40||L.y<-40||L.y>H+40) missThrow();
+      }
+      if(S.phase==='steal'){
+        var tTeam=S.thiefTeam, dTeam=S.defenderTeam, i, pl;
+        // ---- thieves move: every player on the attacking team runs,
+        // except tagged ones, who are out for the rest of the steal ----
+        for(i=0;i<S.p.length;i++){
+          if(teamOf(i)!==tTeam || S.p[i].out) continue;
+          pl=S.p[i];
+          if(controller(i)==='ai'){
+            var tp;
+            if(pl.carrying) tp={x:HOMES[tTeam].x,y:HOMES[tTeam].y-20};
+            else if(pl.aiSteal && S.scores[dTeam]>0){
+              // A raid is only called off once the thief has closed to
+              // scouting range and finds a defender still home guarding
+              // (defenders start every phase next to their own basket).
+              // If the defenders have left to rebuild by then, the raid
+              // commits and cannot be called off.
+              if(!pl.aiCommitted && dist(pl,HOMES[dTeam])<380){
+                var guard=false;
+                for(var gi=0;gi<S.p.length;gi++) if(teamOf(gi)===dTeam && dist(S.p[gi],HOMES[dTeam])<170) guard=true;
+                if(guard) pl.aiSteal=false; else pl.aiCommitted=true;
+              }
+              tp = pl.aiSteal ? {x:HOMES[dTeam].x,y:HOMES[dTeam].y-20} : {x:EGG.x,y:EGG.y+26};
+            }
+            else tp={x:EGG.x,y:EGG.y+26};
+            aiMove(pl,tp,190,dt);
+          }else humanMove(pl,232,dt,inputFor(i));
+        }
+        // ---- defenders move: collect and rebuild, then chase ----
+        for(i=0;i<S.p.length;i++){
+          if(teamOf(i)!==dTeam) continue;
+          pl=S.p[i];
+          if(!S.defenderFree){
+            if(controller(i)==='ai'){
+              var fieldBlock=null, bd=1e9;
+              for(var fb=0;fb<S.fallen.length;fb++) if(S.fallen[fb].status==='field'){ var dd=dist(pl,S.fallen[fb]); if(dd<bd){ bd=dd; fieldBlock=S.fallen[fb]; } }
+              // if a thief is closing on our basket and we have eggs to
+              // lose, guard the zone instead of collecting
+              var threat=false;
+              if(S.stealOn && S.scores[dTeam]>0){ for(var ti=0;ti<S.p.length;ti++) if(teamOf(ti)===tTeam && !S.p[ti].out && dist(S.p[ti],HOMES[dTeam])<320) threat=true; }
+              if(threat) aiMove(pl,HOMES[dTeam],220,dt);
+              else if(fieldBlock) aiMove(pl,fieldBlock,220,dt);
+              else if(carriedBy(i)>0 && dist(pl,GATE)>10) aiMove(pl,GATE,220,dt);
+              else if(carriedBy(i)>0){
+                pl.placeT+=dt;
+                if(pl.placeT>0.45){
+                  pl.placeT=0;
+                  for(var cb=0;cb<S.fallen.length;cb++) if(S.fallen[cb].status==='carried'&&S.fallen[cb].carrier===i){ setBlockPlaced(cb); if(popupOpen) renderPopupPiecesOnly(); break; }
+                }
+              }
+              else if(dist(pl,GATE)>10) aiMove(pl,GATE,220,dt);
+            }else{
+              // humans move freely, also while the rebuild popup is open
+              humanMove(pl,240,dt,inputFor(i));
+            }
+          }else{
+            if(controller(i)==='ai'){
+              var near=null, nd=1e9;
+              for(var ci=0;ci<S.p.length;ci++) if(teamOf(ci)===tTeam && !S.p[ci].out){ var cd2=dist(pl,S.p[ci]); if(cd2<nd){ nd=cd2; near=S.p[ci]; } }
+              if(near) aiMove(pl,near,224,dt);
+            }else humanMove(pl,248,dt,inputFor(i));
+          }
+        }
+        // ---- picking blocks up by walking over them (any defender) ----
+        for(i=0;i<S.p.length;i++){
+          if(teamOf(i)!==dTeam) continue;
+          pl=S.p[i];
+          for(var pb=0;pb<S.fallen.length;pb++){
+            var blk=S.fallen[pb];
+            if(blk.status==='field' && dist(pl,blk)<38){
+              blk.status='carried'; blk.carrier=i;
+              if(controller(i)==='local')
+                setHelp('Block picked up: '+(carriedCount()+placedCount())+' of 3. '+((carriedCount()+placedCount())>=3?'Now stand on the glowing gate spot in the middle to rebuild.':'Run over the next fallen block.'));
+            }
+          }
+        }
+        // ---- egg pickup, basket raids, deposits (per active thief) ----
+        for(i=0;i<S.p.length;i++){
+          if(teamOf(i)!==tTeam || S.p[i].out) continue;
+          pl=S.p[i];
+          if(!pl.carrying && S.central>0 && dist(pl,{x:EGG.x,y:EGG.y+16})<52){ pl.carrying=true; pl.carryStolen=false; S.central--; syncHud(); }
+          if(!pl.carrying && S.stealOn && S.scores[dTeam]>0 && dist(pl,{x:HOMES[dTeam].x,y:HOMES[dTeam].y-20})<54){
+            pl.carrying=true; pl.carryStolen=true; S.scores[dTeam]--; syncHud();
+            if(MODE!=='solo') setMsg(teamName(tTeam)+' raided '+teamName(dTeam)+"'s basket!");
+            else if(tTeam===0) setMsg('Your team raided the computer basket! Get that egg home!');
+            else setMsg('The computer raided your basket and is carrying one of your eggs!');
+          }
+          if(pl.carrying && dist(pl,{x:HOMES[tTeam].x,y:HOMES[tTeam].y-20})<54){
+            var wasStolen=pl.carryStolen;
+            pl.carrying=false; pl.carryStolen=false; S.scores[tTeam]++; syncHud();
+            if(!wasStolen && S.central<=0){ endGame(); return; }
+            if(controller(i)==='ai'){ pl.aiSteal = S.stealOn && S.scores[dTeam]>0 && Math.random()<0.5; pl.aiCommitted=false; }
+            if(MODE!=='solo') setMsg(teamName(tTeam)+(wasStolen?' banked a stolen egg! ':' banked an egg. ')+S.central+' eggs left.');
+            else if(tTeam===0) setMsg(wasStolen?'Stolen egg banked! That is a two egg swing. Go again before you get tagged.':'Egg banked! Go get another one before you get tagged.');
+          }
+        }
+        // ---- tags: normally only once the gate is rebuilt, but inside
+        // the defending team's basket zone they can tag at any time.
+        // Tags are individual: a tagged thief is out, the rest run on.
+        for(var di=0;di<S.p.length;di++){
+          if(teamOf(di)!==dTeam) continue;
+          for(var tj=0;tj<S.p.length;tj++){
+            if(teamOf(tj)!==tTeam || S.p[tj].out) continue;
+            var canTag = S.defenderFree || (S.stealOn && dist(S.p[tj],HOMES[dTeam])<ZONE_R);
+            if(canTag && dist(S.p[di],S.p[tj])<36){ tagThief(tj); return; }
+          }
+        }
+      }
+    }
+    function snapshot(){
+      return {phase:S.phase,turn:S.turn,thrower:S.thrower,thiefTeam:S.thiefTeam,defenderTeam:S.defenderTeam,defenderFree:S.defenderFree,
+        central:S.central,scores:S.scores.slice(),stealOn:S.stealOn,ppt:S.ppt,gateBroken:S.gateBroken,rebuilt:S.rebuilt,
+        fallen:S.fallen.map(function(b){return {x:b.x,y:b.y,status:b.status,carrier:b.carrier};}),
+        log:{active:S.log.active,x:S.log.x,y:S.log.y,ang:S.log.ang},
+        p:S.p.map(function(pl){return {x:pl.x,y:pl.y,vx:pl.vx,vy:pl.vy,carrying:pl.carrying,carryStolen:pl.carryStolen,out:pl.out};}),
+        over:S.over,msg:S.msg};
+    }
+    function applySnapshot(snap){
+      var keepMsg=S.msg;
+      for(var k in snap) S[k]=snap[k];
+      if(snap.ppt) PPT=snap.ppt;
+      S.log.vx=0; S.log.vy=0; S.log.dist=0;
+      syncHud();
+      if(snap.msg && snap.msg!==keepMsg) $('et-msg').textContent=snap.msg;
+      S.msg=snap.msg||'';
+      if(MODE==='guest'){
+        refreshNames();
+        if(S.phase==='steal' && teamOf(myIdx)===S.defenderTeam && !S.defenderFree) setHelp('Run over the fallen blocks to pick them up, then stand on the glowing gate spot in the middle to rebuild.');
+        else if(S.phase==='steal' && teamOf(myIdx)===S.thiefTeam) setHelp('Your team is stealing. Run to the eggs, grab one, bring it home, repeat.');
+        else if(S.phase==='aim') setHelp(S.thrower===myIdx?'Your throw. Flick toward the gate.':'Waiting for the throw.');
+      }
+    }
+    function sendGuestInput(){
+      if(!conn||!conn.open) return;
+      var k={}; for(var key in keys) k[key]=keys[key];
+      conn.send({type:'input',keys:k,pointer:{x:pointer.x,y:pointer.y,down:pointer.down}});
+    }
+    function hostBroadcast(){
+      var snap=snapshot();
+      for(var idx in conns){ var c=conns[idx]; if(c&&c.open) c.send({type:'state',s:snap}); }
+    }
+    function handleGuestData(data, idx){
+      if(!data) return;
+      if(data.type==='input'){ remoteInputs[idx]={keys:data.keys||{},pointer:data.pointer||{x:440,y:150,down:false}}; }
+      else if(data.type==='throw'){
+        if(S.phase==='aim' && S.thrower===idx && !S.over && typeof data.vx==='number' && typeof data.vy==='number')
+          throwFlick(S.p[idx],Math.atan2(data.vy,data.vx),Math.sqrt(data.vx*data.vx+data.vy*data.vy),data.spin||0);
+      }
+      else if(data.type==='blockPlaced'){
+        // only a block that guest is personally carrying can be placed
+        if(S.defenderTeam>=0 && teamOf(idx)===S.defenderTeam && typeof data.index==='number' && S.fallen[data.index] && S.fallen[data.index].status==='carried' && S.fallen[data.index].carrier===idx) setBlockPlaced(data.index);
+      }
+      else if(data.type==='newGame'){ newGame(); hostBroadcast(); }
+    }
+    function assignIdx(){
+      // the first empty seat goes to the next guest; -1 means room full
+      for(var i=1;i<2*PPT;i++) if(!conns[i]||!conns[i].open) return i;
+      return -1;
+    }
+    function wireHostConn(c, idx){
+      conns[idx]=c;
+      c.on('open',function(){
+        netConnected=true;
+        c.send({type:'welcome',idx:idx,ppt:PPT});
+        netStatus('A guest joined as Player '+(idx+1)+' ('+teamName(teamOf(idx))+' team).'+(PPT===2?' Empty seats are played by the computer.':''));
+        refreshNames(); newGame(); hostBroadcast();
+      });
+      c.on('data',function(data){ handleGuestData(data, idx); });
+      c.on('close',function(){
+        if(conns[idx]===c) delete conns[idx];
+        netConnected=anyConn();
+        netStatus('A guest left. The computer takes their seat.');
+      });
+      c.on('error',function(){});
+    }
+    function wireConn(c){
+      // the guest's single connection to the host
+      conn=c;
+      c.on('open',function(){
+        netConnected=true;
+        netStatus('Connected to the host. Waiting for your seat...');
+      });
+      c.on('data',function(data){
+        if(!data) return;
+        if(data.type==='state') applySnapshot(data.s);
+        else if(data.type==='welcome'){
+          myIdx=data.idx;
+          if(data.ppt) PPT=data.ppt;
+          refreshNames();
+          netStatus(myIdx<0?'The room is full, you are watching this game.':'Connected! You are Player '+(myIdx+1)+' ('+teamName(teamOf(myIdx))+' team). The host runs the game, your moves are sent to them.');
+        }
+      });
+      c.on('close',function(){ netConnected=false; netStatus('Connection closed. Refresh or host / join again to reconnect.'); });
+      c.on('error',function(){ netStatus('Connection problem. Check the code and try again.'); });
+    }
+    function makeCode(){
+      var chars='ABCDEFGHJKMNPQRSTUVWXYZ23456789', out='';
+      for(var i=0;i<4;i++) out+=chars.charAt(Math.floor(Math.random()*chars.length));
+      return out;
+    }
+    function peerReady(){
+      return typeof window.Peer!=='undefined';
+    }
+    function hostGame(){
+      if(!peerReady()){ netStatus('Online play needs the game page open on the web (the connection library did not load here). Solo still works.'); return; }
+      if(peer){ try{ peer.destroy(); }catch(e){} }
+      var code=makeCode();
+      MODE='host'; myIdx=0; netConnected=false; conns={}; remoteInputs={}; refreshNames(); newGame();
+      peer=new window.Peer('eggthieves-'+code);
+      peer.on('open',function(){ netStatus('Your room code is '+code+'. Tell your friends to open the game, type the code, and press Join. Waiting...'); });
+      peer.on('connection',function(c){
+        var idx=assignIdx();
+        if(idx<0){ c.close(); return; }
+        wireHostConn(c, idx);
+      });
+      peer.on('error',function(){ netStatus('Could not create the room. Try again.'); });
+    }
+    function joinGame(){
+      if(!peerReady()){ netStatus('Online play needs the game page open on the web (the connection library did not load here). Solo still works.'); return; }
+      var code=($('et-code').value||'').trim().toUpperCase();
+      if(!code){ netStatus('Type the room code first, then press Join.'); return; }
+      if(peer){ try{ peer.destroy(); }catch(e){} }
+      MODE='guest'; myIdx=1; netConnected=false; refreshNames();
+      peer=new window.Peer();
+      peer.on('open',function(){
+        netStatus('Joining room '+code+'...');
+        wireConn(peer.connect('eggthieves-'+code,{reliable:true}));
+      });
+      peer.on('error',function(){ netStatus('Could not join. Check the code: the host must be waiting with that exact code.'); });
+    }
+    function drawBlock(x,y,w,h,rot){
+      ctx.save(); ctx.translate(x,y); ctx.rotate(rot||0);
+      ctx.fillStyle='#a9743f'; ctx.strokeStyle='#6d4520'; ctx.lineWidth=2;
+      ctx.fillRect(-w/2,-h/2,w,h); ctx.strokeRect(-w/2,-h/2,w,h); ctx.restore();
+    }
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+      // grass stripes
+      for(var i=0;i<8;i++){ ctx.fillStyle=i%2?'#3e9c4f':'#45a857'; ctx.fillRect(0,i*H/8,W,H/8); }
+      ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=2; ctx.setLineDash([10,8]);
+      ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke(); ctx.setLineDash([]);
+      // egg basket (top center)
+      ctx.fillStyle='#8a5a2b'; ctx.strokeStyle='#5f3c17'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.roundRect(EGG.x-64,EGG.y-34,128,68,10); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.font='bold 13px system-ui'; ctx.textAlign='center';
+      for(var e=0;e<Math.min(S.central,8);e++){ ctx.beginPath(); ctx.ellipse(EGG.x-42+(e%4)*28,EGG.y-8+Math.floor(e/4)*24,9,12,0,0,7); ctx.fill(); ctx.strokeStyle='#ccc'; ctx.lineWidth=1; ctx.stroke(); }
+      ctx.fillStyle='#fff'; ctx.font='bold 14px system-ui'; ctx.fillText('EGGS '+S.central,EGG.x,EGG.y+52);
+      // guard zones around the home baskets (only when stealing is on):
+      // inside your own zone you can tag the thief at any time. The ring
+      // flashes red while the thief is inside the defender's zone.
+      if(S.stealOn){
+        for(var zi=0;zi<2;zi++){
+          var hot=false;
+          if(S.phase==='steal' && zi===S.defenderTeam){ for(var hz=0;hz<S.p.length;hz++) if(teamOf(hz)===S.thiefTeam && dist(S.p[hz],HOMES[zi])<ZONE_R) hot=true; }
+          ctx.beginPath(); ctx.arc(HOMES[zi].x,HOMES[zi].y,ZONE_R,0,7);
+          ctx.fillStyle=zi===0?'rgba(59,130,246,.08)':'rgba(249,115,22,.08)'; ctx.fill();
+          ctx.strokeStyle=hot?'rgba(229,72,77,.95)':(zi===0?'rgba(59,130,246,.55)':'rgba(249,115,22,.55)');
+          ctx.lineWidth=hot?4:2; ctx.setLineDash([10,8]); ctx.stroke(); ctx.setLineDash([]);
+        }
+      }
+      // home baskets
+      for(var i=0;i<2;i++){
+        ctx.fillStyle=i===0?'#1d4ed8':'#c2410c'; ctx.strokeStyle='#333'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.roundRect(HOMES[i].x-52,HOMES[i].y-26,104,52,10); ctx.fill(); ctx.stroke();
+        ctx.fillStyle='#fff'; ctx.font='bold 14px system-ui';
+        ctx.fillText((MODE==='solo'?(PPT===2?(i===0?'YOUR TEAM ':'CPU TEAM '):(i===0?'YOUR BASKET ':'CPU BASKET ')):(teamName(i).toUpperCase()+' TEAM '))+S.scores[i],HOMES[i].x,HOMES[i].y+5);
+      }
+      // gate
+      if(!S.gateBroken){
+        drawBlock(GATE.x-28,GATE.y+6,18,64,0); drawBlock(GATE.x+28,GATE.y+6,18,64,0); drawBlock(GATE.x,GATE.y-30,86,18,0);
+        ctx.fillStyle='#fff'; ctx.font='bold 13px system-ui'; ctx.fillText('GATE',GATE.x,GATE.y+62);
+      }else{
+        // the gate spot in the middle: stand here to rebuild
+        ctx.save();
+        ctx.strokeStyle='rgba(255,235,150,.95)'; ctx.lineWidth=3; ctx.setLineDash([8,6]);
+        ctx.beginPath(); ctx.arc(GATE.x,GATE.y+6,46,0,7); ctx.stroke(); ctx.setLineDash([]);
+        ctx.strokeStyle='rgba(255,255,255,.75)'; ctx.lineWidth=2;
+        ctx.strokeRect(GATE.x-43,GATE.y-40,86,84);
+        ctx.restore();
+        // placed pieces appear back in the gate
+        if(S.rebuilt>=1) drawBlock(GATE.x-28,GATE.y+6,18,64,0);
+        if(S.rebuilt>=2) drawBlock(GATE.x+28,GATE.y+6,18,64,0);
+        if(S.rebuilt>=3) drawBlock(GATE.x,GATE.y-30,86,18,0);
+        // blocks still lying on the field, waiting to be picked up
+        for(var f=0;f<S.fallen.length;f++){ var b=S.fallen[f]; if(b.status==='field') drawBlock(b.x,b.y,54,16,0.7+f*0.5); }
+        ctx.fillStyle='#fff'; ctx.font='bold 13px system-ui';
+        ctx.fillText(S.defenderFree?'GATE REBUILT':('GATE SPOT - BLOCKS '+(carriedCount()+placedCount())+' / 3 PICKED UP'),GATE.x,GATE.y+132);
+      }
+      // aim guide for whoever is throwing, on their own screen: a dashed
+      // line while you are just pointing, and while you flick, your swipe
+      // trail plus the direction and strength your hand is moving
+      if(S.phase==='aim' && !S.over && (MODE==='guest' ? S.thrower===myIdx : controller(S.thrower)==='local')){
+        var tp=S.p[S.thrower];
+        if(flickActive && flickSamples.length>1){
+          ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=3;
+          ctx.beginPath(); ctx.moveTo(flickSamples[0].x,flickSamples[0].y);
+          for(var fs=1;fs<flickSamples.length;fs++) ctx.lineTo(flickSamples[fs].x,flickSamples[fs].y);
+          ctx.stroke();
+          var fv=flickVelocity(flickSamples);
+          if(fv && fv.speed>40){
+            var fl=Math.min(190,fv.speed*0.16), fa=Math.atan2(fv.vy,fv.vx);
+            ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.setLineDash([7,5]);
+            ctx.beginPath(); ctx.moveTo(tp.x,tp.y); ctx.lineTo(tp.x+Math.cos(fa)*fl,tp.y+Math.sin(fa)*fl); ctx.stroke(); ctx.setLineDash([]);
+            var fspin=flickSpin(flickSamples);
+            if(Math.abs(fspin)>0.35){ ctx.fillStyle='#fde68a'; ctx.font='bold 15px system-ui'; ctx.fillText('CURVE THROW!',tp.x,tp.y-34); }
+          }
+        }else{
+          ctx.strokeStyle='rgba(255,255,255,.8)'; ctx.lineWidth=2; ctx.setLineDash([6,6]);
+          ctx.beginPath(); ctx.moveTo(tp.x,tp.y); ctx.lineTo(pointer.x,pointer.y); ctx.stroke(); ctx.setLineDash([]);
+        }
+      }
+      // log
+      if(S.log.active) drawBlock(S.log.x,S.log.y,46,13,S.log.ang||0);
+      else if(S.phase==='aim') drawBlock(S.p[S.thrower].x+20,S.p[S.thrower].y-14,40,11,0.6);
+      // players
+      for(var j=0;j<S.p.length;j++){
+        var p=S.p[j];
+        // speed streaks once a player is really moving, so momentum shows
+        var psp=Math.sqrt((p.vx||0)*(p.vx||0)+(p.vy||0)*(p.vy||0));
+        if(psp>285){
+          ctx.strokeStyle='rgba(255,255,255,.65)'; ctx.lineWidth=3;
+          for(var st=-1;st<=1;st++){
+            var bx=p.x-(p.vx/psp)*26+(-p.vy/psp)*st*10, by=p.y-(p.vy/psp)*26+(p.vx/psp)*st*10;
+            ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx-(p.vx/psp)*20,by-(p.vy/psp)*20); ctx.stroke();
+          }
+        }
+        // a tagged thief sits out the rest of the steal, drawn faded
+        if(p.out) ctx.globalAlpha=0.4;
+        ctx.fillStyle=colorOf(j); ctx.strokeStyle='#fff'; ctx.lineWidth=3;
+        ctx.beginPath(); ctx.arc(p.x,p.y,19,0,7); ctx.fill(); ctx.stroke();
+        ctx.fillStyle='#fff'; ctx.font='bold 13px system-ui'; ctx.fillText(p.out?'OUT':(j===myIdx?'YOU':(MODE==='solo'?'CPU':'P'+(j+1))),p.x,p.y+5);
+        ctx.globalAlpha=1;
+        if(S.phase==='steal' && p.carrying){ ctx.fillStyle='#fff'; ctx.strokeStyle='#bbb'; ctx.lineWidth=1; ctx.beginPath(); ctx.ellipse(p.x,p.y-30,9,12,0,0,7); ctx.fill(); ctx.stroke();
+          // a stolen egg wears the victim team's color as a dot, so
+          // everyone can see it came out of a basket, not the big pile
+          if(p.carryStolen){ ctx.fillStyle=TEAM_COLORS[S.defenderTeam][0]; ctx.beginPath(); ctx.arc(p.x,p.y-30,4.5,0,7); ctx.fill(); } }
+        if(S.phase==='steal' && S.defenderTeam>=0 && teamOf(j)===S.defenderTeam && !S.defenderFree){ var cc=carriedBy(j); for(var bc=0;bc<cc;bc++) drawBlock(p.x-14+bc*14,p.y-30,16,7,0.3); }
+      }
+    }
+    function loop(ts){
+      var dt=Math.min(0.033,(ts-last)/1000||0.016); last=ts;
+      update(dt); draw(); checkPopupTrigger();
+      if(MODE!=='solo' && netConnected){
+        netTimer+=dt;
+        if(netTimer>=0.05){ netTimer=0; if(MODE==='host') hostBroadcast(); else sendGuestInput(); }
+      }
+      requestAnimationFrame(loop);
+    }
+    function canvasPos(ev){
+      var r=cv.getBoundingClientRect();
+      return {x:(ev.clientX-r.left)*W/r.width, y:(ev.clientY-r.top)*H/r.height};
+    }
+    cv.addEventListener('pointermove',function(ev){
+      var pos=canvasPos(ev); pointer.x=pos.x; pointer.y=pos.y;
+      if(flickActive){
+        flickSamples.push({x:pos.x,y:pos.y,t:Date.now()});
+        if(flickSamples.length>120) flickSamples.shift();
+      }
+    });
+    cv.addEventListener('pointerdown',function(ev){
+      cv.focus(); var pos=canvasPos(ev); pointer.x=pos.x; pointer.y=pos.y; pointer.down=true;
+      if(S.over) return;
+      // during your throw turn, pressing starts recording a flick
+      if(S.phase==='aim' && S.thrower===myIdx && (MODE!=='guest'||netConnected)){
+        flickActive=true; flickSamples=[{x:pos.x,y:pos.y,t:Date.now()}];
+      }
+    });
+    cv.addEventListener('pointerup',function(){ finishFlick(); });
+    window.addEventListener('pointerup',function(){ pointer.down=false; finishFlick(); });
+    window.addEventListener('keydown',function(ev){ keys[ev.key.toLowerCase()]=true; if(['arrowup','arrowdown','arrowleft','arrowright',' '].indexOf(ev.key.toLowerCase())>=0) ev.preventDefault(); });
+    window.addEventListener('keyup',function(ev){ keys[ev.key.toLowerCase()]=false; });
+    $('et-new').addEventListener('click',function(){
+      if(MODE==='guest'){ if(conn&&conn.open) conn.send({type:'newGame'}); return; }
+      newGame(); if(MODE==='host') hostBroadcast();
+    });
+    $('et-host').addEventListener('click',hostGame);
+    $('et-join').addEventListener('click',joinGame);
+    // the stealing setting: the host (or the solo player) controls it,
+    // guests pick it up from the host's snapshots
+    $('et-steal').addEventListener('change',function(){
+      if(MODE!=='guest' && S) S.stealOn=$('et-steal').checked;
+    });
+    // the team size setting changes the player count, so it starts a
+    // fresh game; guests get the host's setting from the snapshots
+    $('et-teams').addEventListener('change',function(){
+      if(MODE==='guest') return;
+      newGame(); if(MODE==='host') hostBroadcast();
+    });
+    // Fullscreen: try the real fullscreen API first. If the app or the
+    // browser refuses it (chat iframes and iPhone Safari can), fall back
+    // to focus mode, which pins the game over the whole window with the
+    // same fit-to-screen layout. Either way the button toggles back out.
+    var wrapEl=$('et-wrap'), fullBtn=$('et-full');
+    function inFull(){ return !!(document.fullscreenElement||document.webkitFullscreenElement||wrapEl.classList.contains('et-focus')); }
+    function syncFullBtn(){ fullBtn.textContent=inFull()?'Exit fullscreen':'Fullscreen'; }
+    function enterFocus(){ wrapEl.classList.add('et-focus'); syncFullBtn(); }
+    function exitFocus(){ wrapEl.classList.remove('et-focus'); syncFullBtn(); }
+    fullBtn.addEventListener('click',function(){
+      if(document.fullscreenElement||document.webkitFullscreenElement){
+        if(document.exitFullscreen) document.exitFullscreen();
+        return;
+      }
+      if(wrapEl.classList.contains('et-focus')){ exitFocus(); return; }
+      var req=wrapEl.requestFullscreen||wrapEl.webkitRequestFullscreen;
+      if(!req){ enterFocus(); return; }
+      try{
+        var r=req.call(wrapEl);
+        if(r&&r.catch) r.catch(function(){ enterFocus(); });
+        else setTimeout(syncFullBtn,60);
+      }catch(e){ enterFocus(); }
+    });
+    if(document.addEventListener){
+      document.addEventListener('fullscreenchange',syncFullBtn);
+      document.addEventListener('webkitfullscreenchange',syncFullBtn);
+    }
+    // Dragging in the rebuild popup: press a block, move, release over a
+    // slot in the gate outline and it snaps into place.
+    for(var pi=0;pi<3;pi++){
+      (function(idx){
+        var piece=$('et-piece-'+idx);
+        piece.addEventListener('pointerdown',function(ev){
+          if(!popupOpen||piece.style.display==='none') return;
+          dragIdx=idx; dragLast={x:ev.clientX,y:ev.clientY};
+          piece.style.zIndex=9;
+          if(piece.setPointerCapture){ try{ piece.setPointerCapture(ev.pointerId); }catch(e){} }
+          ev.preventDefault();
+        });
+        piece.addEventListener('pointermove',function(ev){
+          if(dragIdx!==idx||!dragLast) return;
+          var dx=ev.clientX-dragLast.x, dy=ev.clientY-dragLast.y;
+          dragLast={x:ev.clientX,y:ev.clientY};
+          var cur=piece.style.transform.match(/translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/);
+          var ox=cur?parseFloat(cur[1]):0, oy=cur?parseFloat(cur[2]):0;
+          piece.style.transform='translate('+(ox+dx)+'px,'+(oy+dy)+'px)';
+        });
+        piece.addEventListener('pointerup',function(ev){
+          if(dragIdx!==idx) return;
+          dragIdx=-1; dragLast=null; piece.style.zIndex=6;
+          for(var s=0;s<3;s++){
+            if(slotFilled[s]) continue;
+            var r=$('et-slot-'+s).getBoundingClientRect();
+            if(ev.clientX>=r.left-16 && ev.clientX<=r.right+16 && ev.clientY>=r.top-16 && ev.clientY<=r.bottom+16){
+              placePiece(idx,s); return;
+            }
+          }
+          piece.style.transform='';
+        });
+      })(pi);
+    }
+    refreshNames();
+    newGame(); requestAnimationFrame(loop);
+  })();
+  </script>
+</div>
+
+</body>
+</html>
