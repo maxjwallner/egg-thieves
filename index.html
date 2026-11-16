@@ -23,7 +23,23 @@
 <div id="et-wrap" style="box-sizing:border-box;max-width:920px;margin:0 auto;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:var(--hatch-widget-text);">
   <style>
     #et-wrap *{box-sizing:border-box}
-    #et-hud{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px}
+    /* Two-step page: a setup screen first (host, join, settings,
+       Start), then the game view. The game view pieces stay hidden
+       until Start adds .et-on; the setup hides with .et-off. The
+       score chips and Eggs left now live under the board. */
+    #et-setup.et-off{display:none}
+    #et-start{display:block;width:100%;background:var(--hatch-widget-accent);color:var(--hatch-widget-on-accent);border:none;border-radius:999px;padding:12px 16px;font-size:17px;font-weight:700;cursor:pointer;margin-top:2px}
+    #et-hint{font-size:13px;color:var(--hatch-widget-muted);text-align:center;margin-top:6px}
+    #et-topbar{display:none;justify-content:flex-end;margin-bottom:6px}
+    #et-topbar.et-on{display:flex}
+    #et-under{display:none;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-top:8px}
+    #et-under.et-on{display:flex}
+    #et-stage{display:none}
+    #et-stage.et-on{display:block}
+    #et-msg{display:none}
+    #et-msg.et-on{display:block}
+    #et-help{display:none}
+    #et-help.et-on{display:block}
     .et-chip{background:var(--hatch-widget-surface);border:1px solid var(--hatch-widget-border);border-radius:999px;padding:5px 12px;font-size:14px;font-weight:600}
     .et-chip.blue{color:#2563eb}.et-chip.orange{color:#ea580c}
     #et-msg{font-size:15px;font-weight:700;text-align:center;margin:4px 0 8px;min-height:22px}
@@ -45,12 +61,10 @@
     #et-wrap.et-focus{position:fixed;inset:0;z-index:99999}
     #et-wrap:fullscreen #et-stage,#et-wrap.et-focus #et-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
     #et-wrap:fullscreen #et-canvas,#et-wrap.et-focus #et-canvas{width:auto;height:100%;max-width:100%}
-    #et-wrap:fullscreen #et-net,#et-wrap.et-focus #et-net,
+    #et-wrap:fullscreen #et-setup,#et-wrap.et-focus #et-setup,
+    #et-wrap:fullscreen #et-under,#et-wrap.et-focus #et-under,
     #et-wrap:fullscreen #et-help,#et-wrap.et-focus #et-help,
-    #et-wrap:fullscreen #et-msg,#et-wrap.et-focus #et-msg,
-    #et-wrap:fullscreen #et-new,#et-wrap.et-focus #et-new,
-    #et-wrap:fullscreen #et-hud .et-chip,#et-wrap.et-focus #et-hud .et-chip{display:none}
-    #et-wrap:fullscreen #et-hud,#et-wrap.et-focus #et-hud{justify-content:flex-end;margin-bottom:6px}
+    #et-wrap:fullscreen #et-msg,#et-wrap.et-focus #et-msg{display:none}
     #et-wrap:fullscreen,#et-wrap.et-focus,#et-stage{touch-action:none}
     #et-popup{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:330px;max-width:92%;background:var(--hatch-widget-surface);border:2px solid var(--hatch-widget-border);border-radius:14px;box-shadow:0 10px 34px var(--hatch-widget-shadow);padding:14px;z-index:5}
     #et-pop-title{font-size:16px;font-weight:800;text-align:center;margin-bottom:2px}
@@ -64,13 +78,7 @@
     #et-tray{display:flex;gap:10px;justify-content:center;min-height:26px;margin-bottom:10px}
     .et-piece{width:58px;height:20px;background:#a9743f;border:2px solid #6d4520;border-radius:4px;cursor:grab;touch-action:none;position:relative;z-index:6}
   </style>
-  <div id="et-hud">
-    <span class="et-chip blue"><span id="et-n0">You</span>: <span id="et-s0">0</span> eggs</span>
-    <span class="et-chip">Eggs left: <span id="et-eggs">24</span></span>
-    <span class="et-chip orange"><span id="et-n1">Computer</span>: <span id="et-s1">0</span> eggs</span>
-    <button id="et-new" type="button">New game</button>
-    <button id="et-full" class="et-netbtn" type="button">Fullscreen</button>
-  </div>
+  <div id="et-setup">
   <div id="et-net">
     <button id="et-host" class="et-netbtn" type="button">Host online game</button>
     <input id="et-code" type="text" placeholder="CODE" maxlength="6" aria-label="Room code">
@@ -80,6 +88,12 @@
       <select id="et-teams" class="et-netbtn"><option value="1">1 (2 players)</option><option value="2">2 (4 players)</option></select>
     </label>
     <div id="et-net-status">Solo vs computer, or host a room and share the code.</div>
+  </div>
+    <button id="et-start" type="button">Start game</button>
+    <div id="et-hint">Solo vs the computer: just press Start. Online: host or join first, then everyone presses Start on their own device.</div>
+  </div>
+  <div id="et-topbar">
+    <button id="et-full" class="et-netbtn" type="button">Fullscreen</button>
   </div>
   <div id="et-msg">Your throw. Flick toward the gate to throw the log.</div>
   <div id="et-stage">
@@ -98,6 +112,12 @@
         <div class="et-piece" id="et-piece-2"></div>
       </div>
     </div>
+  </div>
+  <div id="et-under">
+    <span class="et-chip blue"><span id="et-n0">You</span>: <span id="et-s0">0</span> eggs</span>
+    <span class="et-chip">Eggs left: <span id="et-eggs">24</span></span>
+    <span class="et-chip orange"><span id="et-n1">Computer</span>: <span id="et-s1">0</span> eggs</span>
+    <button id="et-new" type="button">New game</button>
   </div>
   <div id="et-help">Throw: press, swipe toward the gate, let go. Swipe in an arc for a curve throw. Run: WASD / arrow keys, or press anywhere and drag like a thumb stick.</div>
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -138,6 +158,9 @@
     // player is (with velocity and arrival time). The guest renders
     // from this instead of jumping between snapshots.
     var netP=[];
+    // Two-step page: the setup screen shows first and the game only
+    // starts moving once this device's Start button is pressed.
+    var started=false;
     var conns={}; // host only: player index -> that guest's connection
     var remoteInputs={}; // host only: player index -> last input received
     function emptyInput(){ return {keys:{},stick:{active:false,dx:0,dy:0}}; }
@@ -773,6 +796,9 @@
     }
     function hostBroadcast(){
       var snap=snapshot();
+      // until the host presses Start, guests who already pressed it
+      // see a waiting note instead of a frozen first throw prompt
+      if(!started) snap.msg='Waiting for the host to press Start.';
       for(var idx in conns){ var c=conns[idx]; if(c&&c.open) c.send({type:'state',s:snap}); }
     }
     function handleGuestData(data, idx){
@@ -1014,7 +1040,8 @@
     }
     function loop(ts){
       var dt=Math.min(0.033,(ts-last)/1000||0.016); last=ts;
-      update(dt); if(MODE==='guest') guestStep(dt); draw(); checkPopupTrigger();
+      if(started){ update(dt); if(MODE==='guest') guestStep(dt); }
+      draw(); checkPopupTrigger();
       if(MODE!=='solo' && netConnected){
         netTimer+=dt;
         if(netTimer>=0.0333){ netTimer=0; if(MODE==='host') hostBroadcast(); else sendGuestInput(); }
@@ -1066,6 +1093,20 @@
       if(MODE==='guest'){ if(conn&&conn.open) conn.send({type:'newGame'}); return; }
       newGame(); if(MODE==='host') hostBroadcast();
     });
+    // Start: the setup screen goes away, the game view appears, and
+    // the game goes fullscreen. Each device presses its own Start:
+    // the host's Start sets the match going (a fresh game with the
+    // chosen settings), a guest's Start just opens its view onto the
+    // host's game, and with no hosting or joining it starts solo.
+    $('et-start').addEventListener('click',function(){
+      if(started) return;
+      started=true;
+      $('et-setup').classList.add('et-off');
+      var show=['et-topbar','et-msg','et-stage','et-under','et-help'];
+      for(var si=0;si<show.length;si++) $(show[si]).classList.add('et-on');
+      if(MODE!=='guest'){ newGame(); if(MODE==='host') hostBroadcast(); }
+      enterFull();
+    });
     $('et-host').addEventListener('click',hostGame);
     $('et-join').addEventListener('click',joinGame);
     // the stealing setting: the host (or the solo player) controls it,
@@ -1088,12 +1129,8 @@
     function syncFullBtn(){ fullBtn.textContent=inFull()?'Exit fullscreen':'Fullscreen'; }
     function enterFocus(){ wrapEl.classList.add('et-focus'); syncFullBtn(); }
     function exitFocus(){ wrapEl.classList.remove('et-focus'); syncFullBtn(); }
-    fullBtn.addEventListener('click',function(){
-      if(document.fullscreenElement||document.webkitFullscreenElement){
-        if(document.exitFullscreen) document.exitFullscreen();
-        return;
-      }
-      if(wrapEl.classList.contains('et-focus')){ exitFocus(); return; }
+    function enterFull(){
+      if(inFull()) return;
       var req=wrapEl.requestFullscreen||wrapEl.webkitRequestFullscreen;
       if(!req){ enterFocus(); return; }
       try{
@@ -1101,6 +1138,14 @@
         if(r&&r.catch) r.catch(function(){ enterFocus(); });
         else setTimeout(syncFullBtn,60);
       }catch(e){ enterFocus(); }
+    }
+    fullBtn.addEventListener('click',function(){
+      if(document.fullscreenElement||document.webkitFullscreenElement){
+        if(document.exitFullscreen) document.exitFullscreen();
+        return;
+      }
+      if(wrapEl.classList.contains('et-focus')){ exitFocus(); return; }
+      enterFull();
     });
     if(document.addEventListener){
       document.addEventListener('fullscreenchange',syncFullBtn);
