@@ -849,12 +849,17 @@
     // (different networks, phone data, hotel WiFi that keeps devices
     // apart). With no relay configured, joins on such networks hang
     // forever at "Joining..." and never show an error.
+    // The relay below is Max's own Metered TURN app (free tier,
+    // set up Nov 15, 2026) after the free public relay would not
+    // answer. These credentials live in the page on purpose: the
+    // browsers need them to use the relay. The only thing they
+    // expose is the free monthly allowance.
     var PEER_OPTS={config:{iceServers:[
-      {urls:'stun:stun.l.google.com:19302'},
-      {urls:'stun:stun.cloudflare.com:3478'},
-      {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
-      {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
-      {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
+      {urls:'stun:stun.relay.metered.ca:80'},
+      {urls:'turn:global.relay.metered.ca:80',username:'4efc596d1e396e4115fb3222',credential:'PwoaqBPIDuq6yYUh'},
+      {urls:'turn:global.relay.metered.ca:80?transport=tcp',username:'4efc596d1e396e4115fb3222',credential:'PwoaqBPIDuq6yYUh'},
+      {urls:'turn:global.relay.metered.ca:443',username:'4efc596d1e396e4115fb3222',credential:'PwoaqBPIDuq6yYUh'},
+      {urls:'turns:global.relay.metered.ca:443?transport=tcp',username:'4efc596d1e396e4115fb3222',credential:'PwoaqBPIDuq6yYUh'}
     ]}};
     function peerErrorText(err){
       var t=err&&err.type?err.type:'';
